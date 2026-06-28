@@ -122,7 +122,9 @@ Required for password reset emails to work, and to confirm sign-ups are open.
 
 ## Step 9 — (Optional) Set Up Daily Email Summaries
 
-This sends a daily email at 8pm with each user's calorie summary. Requires a free **Resend** account.
+> **App owner only** — your wife and friends don't need to do any of this. You set it up once and it works for everyone. Each user just toggles "Daily email summary" on in their own Settings.
+
+This sends a daily email at 8pm with each user's calorie summary. Requires a free **Resend** account (one account, set up by you).
 
 1. Go to **resend.com** → sign up (free, no credit card required)
 2. Click **API Keys** → **Create API Key** → copy it
