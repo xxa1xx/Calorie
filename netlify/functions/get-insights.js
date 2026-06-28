@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { buildDietaryContext } from './_dietary.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -29,21 +30,14 @@ export const handler = async (event) => {
     meals: day.descriptions?.join(', ') || 'no data',
   }))
 
-  const glp1Section = profile.on_glp1 ? `
-GLP-1 medication context: This user is on a GLP-1 medication. When analysing:
-- Eating consistently below calorie target is NORMAL and expected — do not flag this as a problem
-- Focus on whether protein targets are being met (muscle preservation is critical)
-- Highlight consistency in logging and eating patterns
-- Note if they are making good nutrient-dense food choices
-- Celebrate small victories — GLP-1 journeys require patience
-- Flag only genuine concerns (e.g. extremely low protein, or almost no food logged for multiple days)` : ''
+  const dietaryContext = buildDietaryContext(profile.dietary_options)
 
   const prompt = `You are a nutrition coach analysing a week of eating data to provide personalised insights.
 
 User profile:
-- Goal: ${profile.goal} weight (${profile.current_weight_kg}kg → ${profile.goal_weight_kg}kg)${profile.on_glp1 ? '\n- On GLP-1 medication' : ''}
+- Goal: ${profile.goal} weight (${profile.current_weight_kg}kg → ${profile.goal_weight_kg}kg)
 - Daily targets: ${profile.daily_calorie_target} kcal, ${profile.daily_protein_target}g protein, ${profile.daily_carbs_target}g carbs, ${profile.daily_fat_target}g fat
-${glp1Section}
+${dietaryContext}
 
 Last 7 days of data:
 ${JSON.stringify(logSummary, null, 2)}

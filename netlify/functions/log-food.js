@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { buildDietaryContext } from './_dietary.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -24,18 +25,16 @@ export const handler = async (event) => {
     ? `Calories logged so far today: ${todayLog.calories} / ${profile.daily_calorie_target} kcal, Protein: ${todayLog.protein_g}g / ${profile.daily_protein_target}g, Carbs: ${todayLog.carbs_g}g / ${profile.daily_carbs_target}g, Fat: ${todayLog.fat_g}g / ${profile.daily_fat_target}g`
     : 'No food logged yet today.'
 
-  const glp1Context = profile.on_glp1
-    ? `IMPORTANT: This user is on a GLP-1 medication (e.g. Ozempic/Wegovy). They likely have reduced appetite and eat smaller portions. Celebrate protein intake, encourage nutrient-dense choices, be understanding if intake is below target — this is expected and healthy on GLP-1. Avoid suggestions that may worsen nausea. Hydration is especially important.`
-    : ''
+  const dietaryContext = buildDietaryContext(profile.dietary_options)
 
-  const systemPrompt = `You are a nutrition expert AI assistant. Analyze food and estimate calories and macronutrients accurately. When amounts are ambiguous, use standard portion sizes. Always respond with valid JSON only, no markdown.${glp1Context ? '\n\n' + glp1Context : ''}`
+  const systemPrompt = `You are a nutrition expert AI assistant. Analyse food and estimate calories and macronutrients accurately. When amounts are ambiguous, use standard portion sizes. Always respond with valid JSON only, no markdown.${dietaryContext}`
 
-  const textPrompt = `Analyze this food entry and return nutrition data as JSON.
+  const textPrompt = `Analyse this food entry and return nutrition data as JSON.
 
 ${description ? `Food description: "${description}"` : 'Identify the food shown in the image.'}
 
 User profile:
-- Goal: ${profile.goal} weight (current: ${profile.current_weight_kg}kg, goal: ${profile.goal_weight_kg}kg)${profile.on_glp1 ? '\n- On GLP-1 medication' : ''}
+- Goal: ${profile.goal} weight (current: ${profile.current_weight_kg}kg, goal: ${profile.goal_weight_kg}kg)
 - Daily targets: ${profile.daily_calorie_target} kcal, ${profile.daily_protein_target}g protein, ${profile.daily_carbs_target}g carbs, ${profile.daily_fat_target}g fat
 - ${todayTotals}
 
@@ -56,15 +55,12 @@ Return this exact JSON structure (no markdown, no code blocks):
       "fat_g": <fat>
     }
   ],
-  "feedback": "<1-2 sentences of personalized feedback about this meal in context of their daily progress and goal${profile.on_glp1 ? ', acknowledging GLP-1 context where relevant' : ''}"
+  "feedback": "<1-2 sentences of personalised feedback about this meal in context of their daily progress, goal, and dietary preferences>"
 }`
 
   const messageContent = imageBase64
     ? [
-        {
-          type: 'image',
-          source: { type: 'base64', media_type: imageType || 'image/jpeg', data: imageBase64 },
-        },
+        { type: 'image', source: { type: 'base64', media_type: imageType || 'image/jpeg', data: imageBase64 } },
         { type: 'text', text: textPrompt },
       ]
     : textPrompt
@@ -100,7 +96,7 @@ Return this exact JSON structure (no markdown, no code blocks):
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ error: 'Failed to analyze food. Please try again.' }),
+      body: JSON.stringify({ error: 'Failed to analyse food. Please try again.' }),
     }
   }
 }

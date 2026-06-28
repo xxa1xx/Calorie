@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { exportToCSV } from '../lib/export'
+import { DIETARY_OPTIONS } from '../lib/dietary'
 import MacroProgress from './MacroProgress'
 import FoodLogger from './FoodLogger'
 import FoodEntry from './FoodEntry'
@@ -11,6 +12,7 @@ import WaterTracker from './WaterTracker'
 import QuickLog from './QuickLog'
 import CalorieChart from './CalorieChart'
 import WeightTracker from './WeightTracker'
+import Settings from './Settings'
 
 function sumLogs(logs) {
   return logs.reduce(
@@ -86,22 +88,41 @@ export default function Dashboard({ profile, onUpdateProfile }) {
     setExporting(false)
   }
 
+  const [currentProfile, setCurrentProfile] = useState(profile)
+
+  const handleProfileSaved = (updated) => {
+    setCurrentProfile(updated)
+    onUpdateProfile(updated)
+  }
+
+  const activeDietaryOptions = (currentProfile.dietary_options || [])
+    .map((id) => DIETARY_OPTIONS.find((o) => o.id === id))
+    .filter(Boolean)
+
   const tabs = [
     { id: 'today', label: 'Today' },
     { id: 'progress', label: 'Progress' },
     { id: 'suggestions', label: 'Suggestions' },
     { id: 'insights', label: 'Insights' },
+    { id: 'settings', label: '⚙️' },
   ]
 
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-2xl">🥗</span>
             <h1 className="font-bold text-gray-900">CalorieAI</h1>
-            {profile.on_glp1 && (
-              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">GLP-1</span>
+            {activeDietaryOptions.slice(0, 3).map((opt) => (
+              <span key={opt.id} className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full font-medium hidden sm:inline">
+                {opt.icon} {opt.label}
+              </span>
+            ))}
+            {activeDietaryOptions.length > 3 && (
+              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full hidden sm:inline">
+                +{activeDietaryOptions.length - 3} more
+              </span>
             )}
           </div>
           <div className="flex items-center gap-3">
@@ -136,10 +157,10 @@ export default function Dashboard({ profile, onUpdateProfile }) {
           <>
             {activeTab === 'today' && (
               <>
-                <MacroProgress profile={profile} todayTotals={todayTotals} />
+                <MacroProgress profile={currentProfile} todayTotals={todayTotals} />
                 <WaterTracker />
                 <QuickLog onLogged={handleFoodLogged} />
-                <FoodLogger profile={profile} todayTotals={todayTotals} onLogged={handleFoodLogged} />
+                <FoodLogger profile={currentProfile} todayTotals={todayTotals} onLogged={handleFoodLogged} />
 
                 {todayLogs.length > 0 && (
                   <div className="card">
@@ -164,8 +185,8 @@ export default function Dashboard({ profile, onUpdateProfile }) {
 
             {activeTab === 'progress' && (
               <>
-                <CalorieChart weeklyLogs={weeklyLogs} target={profile.daily_calorie_target} />
-                <WeightTracker profile={profile} />
+                <CalorieChart weeklyLogs={weeklyLogs} target={currentProfile.daily_calorie_target} />
+                <WeightTracker profile={currentProfile} />
                 <div className="card">
                   <h2 className="text-lg font-semibold mb-2">Export Data</h2>
                   <p className="text-sm text-gray-500 mb-4">Download your complete food log as a CSV spreadsheet — useful for doctors, dietitians, or your own records.</p>
@@ -185,14 +206,18 @@ export default function Dashboard({ profile, onUpdateProfile }) {
 
             {activeTab === 'suggestions' && (
               <Recommendations
-                profile={profile}
+                profile={currentProfile}
                 todayTotals={todayTotals}
                 recentLogs={recentLogs}
               />
             )}
 
             {activeTab === 'insights' && (
-              <WeeklyInsights profile={profile} weeklyLogs={weeklyLogs} />
+              <WeeklyInsights profile={currentProfile} weeklyLogs={weeklyLogs} />
+            )}
+
+            {activeTab === 'settings' && (
+              <Settings profile={currentProfile} onSaved={handleProfileSaved} />
             )}
           </>
         )}

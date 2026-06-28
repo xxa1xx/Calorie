@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { calculateDailyTargets } from '../lib/calculations'
+import { DIETARY_OPTIONS } from '../lib/dietary'
 
-const STEPS = ['personal', 'body', 'goals']
+const STEPS = ['personal', 'body', 'goals', 'dietary']
 
 const ACTIVITY_OPTIONS = [
   { value: 'sedentary', label: 'Sedentary', desc: 'Desk job, little exercise' },
@@ -28,10 +29,19 @@ export default function Onboarding({ onComplete }) {
     goal_weight_kg: '',
     activity_level: 'moderate',
     goal: 'lose',
-    on_glp1: false,
+    dietary_options: [],
   })
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
+
+  const toggleDietary = (id) => {
+    setForm((f) => ({
+      ...f,
+      dietary_options: f.dietary_options.includes(id)
+        ? f.dietary_options.filter((d) => d !== id)
+        : [...f.dietary_options, id],
+    }))
+  }
 
   const handleNext = () => {
     setError('')
@@ -72,8 +82,10 @@ export default function Onboarding({ onComplete }) {
   const isStepValid = () => {
     if (step === 0) return form.name && form.age && form.gender
     if (step === 1) return form.height_cm && form.current_weight_kg && form.goal_weight_kg
-    return true
+    return true // goals and dietary are always valid
   }
+
+  const stepTitles = ['Personal Info', 'Body Measurements', 'Activity & Goal', 'Dietary Options']
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-green-100 flex items-center justify-center p-4">
@@ -91,9 +103,10 @@ export default function Onboarding({ onComplete }) {
         </div>
 
         <div className="card space-y-5">
+          <h2 className="text-lg font-semibold">{stepTitles[step]}</h2>
+
           {step === 0 && (
             <>
-              <h2 className="text-lg font-semibold">Personal Info</h2>
               <div>
                 <label className="label">Your name</label>
                 <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Alex" />
@@ -106,12 +119,8 @@ export default function Onboarding({ onComplete }) {
                 <label className="label">Gender</label>
                 <div className="flex gap-3">
                   {['male', 'female', 'other'].map((g) => (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() => set('gender', g)}
-                      className={`flex-1 py-2 rounded-lg border text-sm font-medium capitalize transition-colors ${form.gender === g ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-300 text-gray-600'}`}
-                    >
+                    <button key={g} type="button" onClick={() => set('gender', g)}
+                      className={`flex-1 py-2 rounded-lg border text-sm font-medium capitalize transition-colors ${form.gender === g ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-300 text-gray-600'}`}>
                       {g}
                     </button>
                   ))}
@@ -122,7 +131,6 @@ export default function Onboarding({ onComplete }) {
 
           {step === 1 && (
             <>
-              <h2 className="text-lg font-semibold">Body Measurements</h2>
               <div>
                 <label className="label">Height (cm)</label>
                 <input className="input" type="number" value={form.height_cm} onChange={(e) => set('height_cm', e.target.value)} placeholder="175" />
@@ -140,17 +148,12 @@ export default function Onboarding({ onComplete }) {
 
           {step === 2 && (
             <>
-              <h2 className="text-lg font-semibold">Activity & Goals</h2>
               <div>
                 <label className="label">Activity Level</label>
                 <div className="space-y-2">
                   {ACTIVITY_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => set('activity_level', opt.value)}
-                      className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${form.activity_level === opt.value ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:bg-gray-50'}`}
-                    >
+                    <button key={opt.value} type="button" onClick={() => set('activity_level', opt.value)}
+                      className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${form.activity_level === opt.value ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:bg-gray-50'}`}>
                       <div className="font-medium text-sm">{opt.label}</div>
                       <div className="text-xs text-gray-500">{opt.desc}</div>
                     </button>
@@ -160,50 +163,49 @@ export default function Onboarding({ onComplete }) {
               <div>
                 <label className="label">Your Goal</label>
                 <div className="flex gap-3">
-                  {[
-                    { value: 'lose', label: 'Lose Weight' },
-                    { value: 'maintain', label: 'Maintain' },
-                    { value: 'gain', label: 'Gain Weight' },
-                  ].map((g) => (
-                    <button
-                      key={g.value}
-                      type="button"
-                      onClick={() => set('goal', g.value)}
-                      className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${form.goal === g.value ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-300 text-gray-600'}`}
-                    >
+                  {[{ value: 'lose', label: 'Lose Weight' }, { value: 'maintain', label: 'Maintain' }, { value: 'gain', label: 'Gain Weight' }].map((g) => (
+                    <button key={g.value} type="button" onClick={() => set('goal', g.value)}
+                      className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors ${form.goal === g.value ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-300 text-gray-600'}`}>
                       {g.label}
                     </button>
                   ))}
                 </div>
               </div>
+            </>
+          )}
 
-              <div>
-                <label className="label">Medication</label>
-                <button
-                  type="button"
-                  onClick={() => set('on_glp1', !form.on_glp1)}
-                  className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${form.on_glp1 ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:bg-gray-50'}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium text-sm">I'm on a GLP-1 medication</div>
-                      <div className="text-xs text-gray-500 mt-0.5">Ozempic, Wegovy, Mounjaro, Victoza, etc.</div>
-                    </div>
-                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${form.on_glp1 ? 'bg-primary-500 border-primary-500' : 'border-gray-300'}`}>
-                      {form.on_glp1 && (
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                  </div>
-                </button>
-                {form.on_glp1 && (
-                  <p className="text-xs text-primary-700 bg-primary-50 rounded-lg p-2 mt-2">
-                    The AI will adjust its feedback and suggestions for GLP-1 users — celebrating protein intake, recommending small nutrient-dense portions, and understanding that eating below your calorie target is normal and healthy.
-                  </p>
-                )}
+          {step === 3 && (
+            <>
+              <p className="text-sm text-gray-500 -mt-2">
+                Select all that apply. These tune the AI's feedback. You can change these anytime in Settings.
+              </p>
+              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                {DIETARY_OPTIONS.map((opt) => {
+                  const active = form.dietary_options.includes(opt.id)
+                  return (
+                    <button key={opt.id} type="button" onClick={() => toggleDietary(opt.id)}
+                      className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all ${active ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl">{opt.icon}</span>
+                          <div>
+                            <div className="font-medium text-sm">{opt.label}</div>
+                            <div className="text-xs text-gray-400">{opt.examples}</div>
+                          </div>
+                        </div>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${active ? 'bg-primary-500 border-primary-500' : 'border-gray-300'}`}>
+                          {active && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
+              <p className="text-xs text-gray-400">None of these? No problem — skip and continue.</p>
             </>
           )}
 
@@ -215,11 +217,7 @@ export default function Onboarding({ onComplete }) {
                 Back
               </button>
             )}
-            <button
-              className="btn-primary flex-1"
-              onClick={handleNext}
-              disabled={!isStepValid() || saving}
-            >
+            <button className="btn-primary flex-1" onClick={handleNext} disabled={!isStepValid() || saving}>
               {saving ? 'Saving...' : step === STEPS.length - 1 ? 'Get Started' : 'Next'}
             </button>
           </div>

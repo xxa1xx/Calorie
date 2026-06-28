@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { buildDietaryContext } from './_dietary.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -31,21 +32,14 @@ export const handler = async (event) => {
     ? recentLogs.slice(0, 10).map((l) => l.description).join(', ')
     : 'No recent history'
 
-  const glp1Section = profile.on_glp1 ? `
-GLP-1 medication context: This user is on a GLP-1 medication. Prioritise:
-- Small, protein-dense portions (aim for maximum protein per calorie)
-- Easy-to-digest foods that are gentle on the stomach
-- High nutrient density to compensate for lower overall volume
-- Good hydration (suggest water-rich foods or remind about fluids)
-- Avoid heavy, greasy, or very spicy foods that may worsen nausea
-- It is normal and expected that they may not hit their full calorie target` : ''
+  const dietaryContext = buildDietaryContext(profile.dietary_options)
 
   const prompt = `You are a nutrition coach. Suggest 3 meal or snack options based on remaining daily nutrition needs.
 
-User goal: ${profile.goal} weight${profile.on_glp1 ? ' (on GLP-1 medication)' : ''}
+User goal: ${profile.goal} weight
 Remaining today: ${remaining.calories} kcal, ${remaining.protein_g}g protein, ${remaining.carbs_g}g carbs, ${remaining.fat_g}g fat
 Recent foods eaten: ${recentFoods}
-${glp1Section}
+${dietaryContext}
 
 Return exactly this JSON (no markdown, no code blocks):
 {
@@ -57,7 +51,7 @@ Return exactly this JSON (no markdown, no code blocks):
       "protein_g": <protein grams>,
       "carbs_g": <carbs grams>,
       "fat_g": <fat grams>,
-      "why": "<one sentence on why this fits their remaining needs>"
+      "why": "<one sentence on why this fits their remaining needs and dietary preferences>"
     }
   ],
   "summary": "<1-2 sentences of encouragement or tips based on their day so far>"
