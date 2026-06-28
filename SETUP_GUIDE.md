@@ -26,7 +26,7 @@
 
 ## Step 2 — Run the Database Schema
 
-You need to run **5 SQL files in order**. In your Supabase project:
+You need to run **6 SQL files in order**. In your Supabase project:
 
 1. Click **SQL Editor** in the left sidebar → click **New query**
 2. Open **`supabase/schema.sql`** from the repo → paste the full contents → click **Run**
@@ -34,6 +34,7 @@ You need to run **5 SQL files in order**. In your Supabase project:
 4. Click **New query** → open **`supabase/schema-v3.sql`** → paste → click **Run**
 5. Click **New query** → open **`supabase/schema-v4.sql`** → paste → click **Run**
 6. Click **New query** → open **`supabase/schema-v5.sql`** → paste → click **Run**
+7. Click **New query** → open **`supabase/schema-v6.sql`** → paste → click **Run**
 
 Each should say **"Success"**. If you see an error, check you're running them in order.
 
@@ -284,9 +285,11 @@ Once installed, browser notifications (fasting alerts, daily reminders) work eve
 | Build fails on Netlify | Check the build log — usually a misspelled env variable name |
 | "Missing Supabase environment variables" | `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` is missing or misspelled |
 | "Failed to analyse food" | Check `ANTHROPIC_API_KEY` in Netlify; make sure billing is set up at console.anthropic.com |
-| Blank screen after login | The SQL schemas didn't run — re-run all 5 files in Supabase SQL Editor in order |
+| Blank screen after login | The SQL schemas didn't run — re-run all 6 files in Supabase SQL Editor in order |
 | Recipes or Daily Notes not saving | `schema-v4.sql` was not run — run it in Supabase SQL Editor |
 | Fasting timer not saving | `schema-v5.sql` was not run — run it in Supabase SQL Editor |
+| "Daily limit reached" on AI features | Normal — limits are 30/day for AI logging, 10/day for suggestions, 5/day for insights. Resets at midnight UTC. |
+| AI features say "Not signed in" | Session expired — sign out and sign back in |
 | Email summaries not arriving | Check `RESEND_API_KEY` and `SUPABASE_SERVICE_ROLE_KEY` in Netlify; check spam |
 | Email summary shows wrong sender | Update `noreply@yourdomain.com` in `netlify/functions/daily-summary.js` |
 | Barcode not found | Try the 13-digit number manually; not all products are in Open Food Facts |

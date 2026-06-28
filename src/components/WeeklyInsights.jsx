@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { supabase } from '../lib/supabase'
 
 export default function WeeklyInsights({ profile, weeklyLogs }) {
   const [loading, setLoading] = useState(false)
@@ -15,13 +16,23 @@ export default function WeeklyInsights({ profile, weeklyLogs }) {
     setError('')
 
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Not signed in')
+
       const res = await fetch('/api/get-insights', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile, weeklyLogs }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ weeklyLogs }),
       })
 
-      if (!res.ok) throw new Error('Failed to get insights')
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to get insights')
+      }
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setInsights(data)

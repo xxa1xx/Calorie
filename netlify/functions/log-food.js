@@ -1,12 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { buildDietaryContext } from './_dietary.js'
+import { requireAuth, fetchProfile, checkRateLimit, unauthorized, rateLimited } from './_auth.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+const DAILY_LIMIT = 30
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
 
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
+
+  const { user, supabase, error: authError } = await requireAuth(event)
+  if (authError) return unauthorized()
 
   let body
   try {
@@ -15,11 +22,31 @@ export const handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }
   }
 
-  const { description, profile, todayLog, imageBase64, imageType } = body
+  const { description, todayLog, imageBase64, imageType } = body
 
-  if ((!description && !imageBase64) || !profile) {
+  if (!description && !imageBase64) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
   }
+
+  // Validate image size server-side (client check alone is not sufficient)
+  if (imageBase64) {
+    const approxBytes = Math.ceil(imageBase64.length * 0.75)
+    if (approxBytes > MAX_IMAGE_BYTES) {
+      return { statusCode: 400, body: JSON.stringify({ error: 'Image must be under 5MB' }) }
+    }
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    if (imageType && !validTypes.includes(imageType)) {
+      return { statusCode: 400, body: JSON.stringify({ error: 'Unsupported image type' }) }
+    }
+  }
+
+  // Rate limit check — uses auth.uid() inside the RPC, so it's tamper-proof
+  const allowed = await checkRateLimit(supabase, 'log_food_count', DAILY_LIMIT)
+  if (!allowed) return rateLimited(`You've reached the daily AI log limit (${DAILY_LIMIT}/day). Try again tomorrow.`)
+
+  // Fetch profile server-side — never trust client-supplied profile data
+  const { profile, error: profileError } = await fetchProfile(supabase, user.id)
+  if (profileError) return { statusCode: 404, body: JSON.stringify({ error: 'Profile not found' }) }
 
   const todayTotals = todayLog
     ? `Calories logged so far today: ${todayLog.calories} / ${profile.daily_calorie_target} kcal, Protein: ${todayLog.protein_g}g / ${profile.daily_protein_target}g, Carbs: ${todayLog.carbs_g}g / ${profile.daily_carbs_target}g, Fat: ${todayLog.fat_g}g / ${profile.daily_fat_target}g`

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { supabase } from '../lib/supabase'
 
 export default function Recommendations({ profile, todayTotals, recentLogs }) {
   const [loading, setLoading] = useState(false)
@@ -10,13 +11,23 @@ export default function Recommendations({ profile, todayTotals, recentLogs }) {
     setError('')
 
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Not signed in')
+
       const res = await fetch('/api/get-suggestions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile, todayLog: todayTotals, recentLogs }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ todayLog: todayTotals, recentLogs }),
       })
 
-      if (!res.ok) throw new Error('Failed to get suggestions')
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to get suggestions')
+      }
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setSuggestions(data)

@@ -119,18 +119,27 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
     setError('')
 
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Not signed in')
+
       const res = await fetch('/api/log-food', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
           description: description.trim() || undefined,
-          profile,
           todayLog: todayTotals,
           imageBase64: image?.base64,
           imageType: image?.type,
         }),
       })
-      if (!res.ok) throw new Error('Failed to analyse food')
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || 'Failed to analyse food')
+      }
       const data = await res.json()
       if (data.error) throw new Error(data.error)
 

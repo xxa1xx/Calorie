@@ -1,12 +1,18 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { buildDietaryContext } from './_dietary.js'
+import { requireAuth, fetchProfile, checkRateLimit, unauthorized, rateLimited } from './_auth.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+
+const DAILY_LIMIT = 10
 
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
+
+  const { user, supabase, error: authError } = await requireAuth(event)
+  if (authError) return unauthorized()
 
   let body
   try {
@@ -15,11 +21,14 @@ export const handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }
   }
 
-  const { profile, todayLog, recentLogs } = body
+  const { todayLog, recentLogs } = body
 
-  if (!profile) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Missing profile' }) }
-  }
+  const allowed = await checkRateLimit(supabase, 'suggestions_count', DAILY_LIMIT)
+  if (!allowed) return rateLimited(`You've reached the daily suggestions limit (${DAILY_LIMIT}/day). Try again tomorrow.`)
+
+  // Fetch profile server-side
+  const { profile, error: profileError } = await fetchProfile(supabase, user.id)
+  if (profileError) return { statusCode: 404, body: JSON.stringify({ error: 'Profile not found' }) }
 
   const remaining = {
     calories: Math.max(0, profile.daily_calorie_target - (todayLog?.calories || 0)),
