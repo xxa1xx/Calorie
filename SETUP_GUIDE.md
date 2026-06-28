@@ -105,12 +105,18 @@ Now click **Deploy site**.
 
 ## Step 8 — Update Supabase with Your Live URL
 
-Required for password reset emails to work.
+Required for password reset emails to work, and to confirm sign-ups are open.
 
 1. Copy your Netlify URL
 2. In Supabase → **Authentication** → **URL Configuration**
 3. Set **Site URL** to your Netlify URL
 4. Under **Redirect URLs**, add your Netlify URL
+5. In Supabase → **Authentication** → **Providers** → **Email**:
+   - Confirm **Enable email provider** is **on**
+   - Confirm **Confirm email** is **on** (users verify their address before first login)
+   - Make sure no invite-only or restricted sign-up setting is enabled — by default Supabase allows anyone with the URL to create an account, which is what you want
+
+> **Sharing with others:** Once the app is deployed, anyone you give the URL to can go to the app, click **Create Account**, and set up their own profile in about 2 minutes. They don't need to touch Supabase, Netlify, or any API keys — that's a one-time job done by you.
 
 ---
 
