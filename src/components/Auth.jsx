@@ -218,6 +218,9 @@ export default function Auth() {
 
             {mode === 'signup' && (
               <>
+                <p className="text-xs text-primary-700 bg-primary-50 rounded-lg px-3 py-2 -mt-1">
+                  Free to join — set up your personal profile in about 2 minutes.
+                </p>
                 <PasswordStrengthBar password={password} />
                 <PasswordInput
                   id="confirm-password"
