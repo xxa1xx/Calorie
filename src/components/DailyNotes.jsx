@@ -35,7 +35,14 @@ export default function DailyNotes({ onWorkoutDayChange }) {
     setSaving(true)
 
     await supabase.from('daily_meta').upsert(
-      { user_id: user.id, date: today, ...updated, updated_at: new Date().toISOString() },
+      {
+        user_id: user.id,
+        date: today,
+        is_workout_day: updated.is_workout_day,
+        mood: updated.mood,
+        notes: updated.notes,
+        updated_at: new Date().toISOString(),
+      },
       { onConflict: 'user_id,date' }
     )
 

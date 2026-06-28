@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { calculateDailyTargets } from '../lib/calculations'
 import { DIETARY_OPTIONS } from '../lib/dietary'
+import { requestPermission, getPermission, scheduleDailyReminder } from '../lib/notifications'
 
 const ACTIVITY_OPTIONS = [
   { value: 'sedentary', label: 'Sedentary', desc: 'Desk job, little exercise' },
@@ -43,10 +44,15 @@ export default function Settings({ profile, onSaved }) {
     goal: profile.goal || 'lose',
     dietary_options: profile.dietary_options || [],
     workout_calorie_bonus: profile.workout_calorie_bonus ?? 200,
+    email_summary: profile.email_summary ?? false,
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [notifPermission, setNotifPermission] = useState(getPermission())
+  const [reminderEnabled, setReminderEnabled] = useState(
+    () => localStorage.getItem('calorieai-reminder') === 'true'
+  )
 
   const set = (key, val) => { setForm((f) => ({ ...f, [key]: val })); setSaved(false) }
 
@@ -60,6 +66,26 @@ export default function Settings({ profile, onSaved }) {
     }))
   }
 
+  const handleEnableReminder = async () => {
+    const granted = await requestPermission()
+    setNotifPermission(getPermission())
+    if (granted) {
+      setReminderEnabled(true)
+      localStorage.setItem('calorieai-reminder', 'true')
+      scheduleDailyReminder(true, async () => {
+        const today = new Date().toISOString().split('T')[0]
+        const { data } = await supabase.from('food_logs').select('id').eq('user_id', user.id).eq('date', today).limit(1)
+        return !!data?.length
+      })
+    }
+  }
+
+  const handleDisableReminder = () => {
+    setReminderEnabled(false)
+    localStorage.removeItem('calorieai-reminder')
+    scheduleDailyReminder(false, null)
+  }
+
   const handleSave = async () => {
     setSaving(true)
     setError('')
@@ -70,6 +96,7 @@ export default function Settings({ profile, onSaved }) {
       height_cm: parseFloat(form.height_cm),
       current_weight_kg: parseFloat(form.current_weight_kg),
       goal_weight_kg: parseFloat(form.goal_weight_kg),
+      workout_calorie_bonus: parseInt(form.workout_calorie_bonus) || 0,
     }
 
     const targets = calculateDailyTargets(profileData)
@@ -215,6 +242,49 @@ export default function Settings({ profile, onSaved }) {
             </div>
           </div>
         )}
+      </Section>
+
+      <Section title="Notifications">
+        <div className="space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-800">Browser reminders</p>
+              <p className="text-xs text-gray-500 mt-0.5">Get a notification at 7pm if you haven't logged today</p>
+            </div>
+            {notifPermission === 'denied' ? (
+              <span className="text-xs text-red-600 shrink-0">Blocked in browser settings</span>
+            ) : reminderEnabled ? (
+              <button onClick={handleDisableReminder} className="text-xs text-gray-500 hover:text-gray-700 px-3 py-1 rounded-lg border border-gray-200 shrink-0">
+                Turn off
+              </button>
+            ) : (
+              <button onClick={handleEnableReminder} className="btn-primary text-xs px-3 py-1.5 shrink-0">
+                Enable
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-gray-800">Daily email summary</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Receive a daily summary at 8pm. Requires <code className="bg-gray-100 px-1 rounded">RESEND_API_KEY</code> in Netlify — see Setup Guide.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => set('email_summary', !form.email_summary)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${form.email_summary ? 'bg-primary-500' : 'bg-gray-200'}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${form.email_summary ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+          {form.email_summary && (
+            <p className="text-xs text-primary-700 bg-primary-50 rounded-lg p-2">
+              Summary will be sent to your account email. Make sure you've set <code>RESEND_API_KEY</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code> in your Netlify environment variables.
+            </p>
+          )}
+        </div>
       </Section>
 
       {error && <div className="bg-red-50 text-red-700 text-sm rounded-lg p-3">{error}</div>}

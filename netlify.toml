@@ -11,6 +11,9 @@
 [functions]
   node_bundler = "esbuild"
 
+[functions."daily-summary"]
+  schedule = "0 20 * * *"
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"

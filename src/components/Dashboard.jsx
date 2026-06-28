@@ -15,6 +15,8 @@ import WeightTracker from './WeightTracker'
 import Settings from './Settings'
 import DailyNotes from './DailyNotes'
 import RecipeLibrary from './RecipeLibrary'
+import FastingTimer from './FastingTimer'
+import FoodLogHistory from './FoodLogHistory'
 
 function sumLogs(logs) {
   return logs.reduce(
@@ -23,34 +25,41 @@ function sumLogs(logs) {
       protein_g: acc.protein_g + (l.protein_g || 0),
       carbs_g: acc.carbs_g + (l.carbs_g || 0),
       fat_g: acc.fat_g + (l.fat_g || 0),
+      fiber_g: acc.fiber_g + (l.fiber_g || 0),
     }),
-    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 }
+    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0 }
   )
 }
 
-function calcStreak(weeklyLogs) {
-  if (!weeklyLogs.length) return 0
-  const today = new Date().toISOString().split('T')[0]
-  const loggedDates = new Set(weeklyLogs.map((l) => l.date))
+function calcStreak(allLogs) {
+  if (!allLogs.length) return 0
+  const loggedDates = new Set(allLogs.map((l) => l.date))
   let streak = 0
-  let d = new Date()
-  while (true) {
+  const d = new Date()
+  const todayStr = d.toISOString().split('T')[0]
+  if (!loggedDates.has(todayStr)) d.setDate(d.getDate() - 1)
+  while (streak < 365) {
     const dateStr = d.toISOString().split('T')[0]
-    if (loggedDates.has(dateStr)) {
-      streak++
-      d.setDate(d.getDate() - 1)
-    } else if (dateStr === today) {
-      break
-    } else {
-      break
-    }
+    if (!loggedDates.has(dateStr)) break
+    streak++
+    d.setDate(d.getDate() - 1)
   }
   return streak
+}
+
+function calcRollover(allLogs, targetCalories) {
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+  const yLogs = allLogs.filter((l) => l.date === yesterday)
+  if (!yLogs.length) return 0
+  const yCalories = yLogs.reduce((a, l) => a + (l.calories || 0), 0)
+  const deficit = targetCalories - yCalories
+  return Math.min(Math.max(0, Math.round(deficit)), 300)
 }
 
 export default function Dashboard({ profile, onUpdateProfile }) {
   const { user, signOut } = useAuth()
   const [todayLogs, setTodayLogs] = useState([])
+  const [allLogs, setAllLogs] = useState([])
   const [weeklyLogs, setWeeklyLogs] = useState([])
   const [recentLogs, setRecentLogs] = useState([])
   const [activeTab, setActiveTab] = useState('today')
@@ -58,6 +67,8 @@ export default function Dashboard({ profile, onUpdateProfile }) {
   const [exporting, setExporting] = useState(false)
   const [isWorkoutDay, setIsWorkoutDay] = useState(false)
   const [streak, setStreak] = useState(0)
+  const [copying, setCopying] = useState(false)
+  const [copyMsg, setCopyMsg] = useState('')
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -74,7 +85,9 @@ export default function Dashboard({ profile, onUpdateProfile }) {
     if (!data) return
 
     setTodayLogs(data.filter((l) => l.date === today))
+    setAllLogs(data)
     setRecentLogs(data)
+    setStreak(calcStreak(data))
 
     const byDate = {}
     data.forEach((log) => {
@@ -85,9 +98,7 @@ export default function Dashboard({ profile, onUpdateProfile }) {
       byDate[log.date].fat_g += log.fat_g || 0
       byDate[log.date].descriptions.push(log.description)
     })
-    const sorted = Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date))
-    setWeeklyLogs(sorted)
-    setStreak(calcStreak(sorted))
+    setWeeklyLogs(Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date)))
     setLoading(false)
   }, [user.id, today])
 
@@ -95,11 +106,37 @@ export default function Dashboard({ profile, onUpdateProfile }) {
 
   const todayTotals = sumLogs(todayLogs)
 
+  const [currentProfile, setCurrentProfile] = useState(profile)
+  const rolloverCalories = calcRollover(allLogs, currentProfile.daily_calorie_target)
+
   const handleFoodLogged = () => loadData()
 
   const handleDeleteEntry = (id) => {
     setTodayLogs((prev) => prev.filter((l) => l.id !== id))
+    setAllLogs((prev) => prev.filter((l) => l.id !== id))
     setRecentLogs((prev) => prev.filter((l) => l.id !== id))
+  }
+
+  const handleCopyYesterday = async () => {
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+    const yesterdayLogs = allLogs.filter((l) => l.date === yesterday)
+    if (!yesterdayLogs.length) { setCopyMsg("Nothing logged yesterday"); setTimeout(() => setCopyMsg(''), 3000); return }
+
+    setCopying(true)
+    const entries = yesterdayLogs.map(({ id, logged_at, date, ...rest }) => ({
+      ...rest,
+      date: today,
+      logged_at: new Date().toISOString(),
+    }))
+    const { error } = await supabase.from('food_logs').insert(entries)
+    if (!error) {
+      await loadData()
+      setCopyMsg(`Copied ${entries.length} entries from yesterday`)
+    } else {
+      setCopyMsg('Failed to copy')
+    }
+    setCopying(false)
+    setTimeout(() => setCopyMsg(''), 4000)
   }
 
   const handleExport = async () => {
@@ -113,8 +150,6 @@ export default function Dashboard({ profile, onUpdateProfile }) {
     setExporting(false)
   }
 
-  const [currentProfile, setCurrentProfile] = useState(profile)
-
   const handleProfileSaved = (updated) => {
     setCurrentProfile(updated)
     onUpdateProfile(updated)
@@ -126,6 +161,7 @@ export default function Dashboard({ profile, onUpdateProfile }) {
 
   const tabs = [
     { id: 'today', label: 'Today' },
+    { id: 'history', label: 'History' },
     { id: 'recipes', label: 'Recipes' },
     { id: 'progress', label: 'Progress' },
     { id: 'suggestions', label: 'Suggestions' },
@@ -140,14 +176,14 @@ export default function Dashboard({ profile, onUpdateProfile }) {
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-2xl">🥗</span>
             <h1 className="font-bold text-gray-900">CalorieAI</h1>
-            {activeDietaryOptions.slice(0, 3).map((opt) => (
+            {activeDietaryOptions.slice(0, 2).map((opt) => (
               <span key={opt.id} className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full font-medium hidden sm:inline">
                 {opt.icon} {opt.label}
               </span>
             ))}
-            {activeDietaryOptions.length > 3 && (
+            {activeDietaryOptions.length > 2 && (
               <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full hidden sm:inline">
-                +{activeDietaryOptions.length - 3} more
+                +{activeDietaryOptions.length - 2} more
               </span>
             )}
           </div>
@@ -186,11 +222,27 @@ export default function Dashboard({ profile, onUpdateProfile }) {
                   todayTotals={todayTotals}
                   isWorkoutDay={isWorkoutDay}
                   streak={streak}
+                  rolloverCalories={rolloverCalories}
                 />
                 <DailyNotes onWorkoutDayChange={setIsWorkoutDay} />
+                <FastingTimer />
                 <WaterTracker />
                 <QuickLog onLogged={handleFoodLogged} />
                 <FoodLogger profile={currentProfile} todayTotals={todayTotals} onLogged={handleFoodLogged} />
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={handleCopyYesterday}
+                    disabled={copying}
+                    className="btn-secondary text-sm flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    {copying ? 'Copying...' : 'Copy Yesterday'}
+                  </button>
+                  {copyMsg && <span className="text-sm text-gray-500">{copyMsg}</span>}
+                </div>
 
                 {todayLogs.length > 0 && (
                   <div className="card">
@@ -213,6 +265,10 @@ export default function Dashboard({ profile, onUpdateProfile }) {
               </>
             )}
 
+            {activeTab === 'history' && (
+              <FoodLogHistory allLogs={allLogs} profile={currentProfile} />
+            )}
+
             {activeTab === 'recipes' && (
               <RecipeLibrary onLogged={handleFoodLogged} />
             )}
@@ -223,12 +279,8 @@ export default function Dashboard({ profile, onUpdateProfile }) {
                 <WeightTracker profile={currentProfile} />
                 <div className="card">
                   <h2 className="text-lg font-semibold mb-2">Export Data</h2>
-                  <p className="text-sm text-gray-500 mb-4">Download your complete food log as a CSV spreadsheet — useful for doctors, dietitians, or your own records.</p>
-                  <button
-                    onClick={handleExport}
-                    disabled={exporting}
-                    className="btn-secondary flex items-center gap-2"
-                  >
+                  <p className="text-sm text-gray-500 mb-4">Download your complete food log as a CSV file — useful for doctors, dietitians, or your own records.</p>
+                  <button onClick={handleExport} disabled={exporting} className="btn-secondary flex items-center gap-2">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
@@ -239,11 +291,7 @@ export default function Dashboard({ profile, onUpdateProfile }) {
             )}
 
             {activeTab === 'suggestions' && (
-              <Recommendations
-                profile={currentProfile}
-                todayTotals={todayTotals}
-                recentLogs={recentLogs}
-              />
+              <Recommendations profile={currentProfile} todayTotals={todayTotals} recentLogs={recentLogs} />
             )}
 
             {activeTab === 'insights' && (

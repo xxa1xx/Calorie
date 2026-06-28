@@ -1,5 +1,3 @@
-import { getProgressColor } from '../lib/calculations'
-
 function MacroBar({ label, current, target, color, unit = 'g' }) {
   const pct = Math.min(100, Math.round((current / Math.max(1, target)) * 100))
   const barColor = pct >= 100 ? 'bg-red-500' : color
@@ -11,21 +9,19 @@ function MacroBar({ label, current, target, color, unit = 'g' }) {
         <span className="text-gray-500">{Math.round(current)}{unit} / {target}{unit}</span>
       </div>
       <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-          style={{ width: `${pct}%` }}
-        />
+        <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
   )
 }
 
-export default function MacroProgress({ profile, todayTotals, isWorkoutDay, streak }) {
-  const { calories = 0, protein_g = 0, carbs_g = 0, fat_g = 0 } = todayTotals || {}
+export default function MacroProgress({ profile, todayTotals, isWorkoutDay, streak, rolloverCalories }) {
+  const { calories = 0, protein_g = 0, carbs_g = 0, fat_g = 0, fiber_g = 0 } = todayTotals || {}
   const workoutBonus = isWorkoutDay ? (profile.workout_calorie_bonus || 200) : 0
-  const effectiveTarget = profile.daily_calorie_target + workoutBonus
+  const effectiveTarget = profile.daily_calorie_target + workoutBonus + (rolloverCalories || 0)
   const calPct = Math.round((calories / Math.max(1, effectiveTarget)) * 100)
   const remaining = Math.max(0, effectiveTarget - calories)
+  const netCarbs = Math.max(0, Math.round(carbs_g - fiber_g))
 
   return (
     <div className="card">
@@ -34,7 +30,7 @@ export default function MacroProgress({ profile, todayTotals, isWorkoutDay, stre
         <div className="flex items-center gap-2">
           {streak > 0 && (
             <span className="text-xs bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-medium">
-              🔥 {streak} day streak
+              🔥 {streak}
             </span>
           )}
           <span className={`text-sm font-medium px-2.5 py-1 rounded-full ${calPct >= 100 ? 'bg-red-100 text-red-700' : 'bg-primary-100 text-primary-700'}`}>
@@ -45,10 +41,13 @@ export default function MacroProgress({ profile, todayTotals, isWorkoutDay, stre
 
       <div className="text-center py-4 mb-5 bg-gray-50 rounded-xl">
         <div className="text-4xl font-bold text-gray-900">{Math.round(calories)}</div>
-        <div className="text-sm text-gray-500 mt-1">
-          of {effectiveTarget} kcal
+        <div className="text-sm text-gray-500 mt-1 flex items-center justify-center gap-2 flex-wrap">
+          <span>of {effectiveTarget} kcal</span>
           {isWorkoutDay && workoutBonus > 0 && (
-            <span className="ml-1.5 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">💪 +{workoutBonus}</span>
+            <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">💪 +{workoutBonus}</span>
+          )}
+          {rolloverCalories > 0 && (
+            <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">+{rolloverCalories} rollover</span>
           )}
         </div>
         <div className="text-sm text-gray-600 mt-1">{remaining} kcal remaining</div>
@@ -57,6 +56,13 @@ export default function MacroProgress({ profile, todayTotals, isWorkoutDay, stre
       <div className="space-y-4">
         <MacroBar label="Protein" current={protein_g} target={profile.daily_protein_target} color="bg-blue-500" />
         <MacroBar label="Carbs" current={carbs_g} target={profile.daily_carbs_target} color="bg-yellow-500" />
+        {fiber_g > 0 && (
+          <div className="flex items-center gap-2 text-xs text-gray-500 -mt-2 pl-1">
+            <span>Net carbs: <strong className="text-gray-700">{netCarbs}g</strong></span>
+            <span className="text-gray-300">·</span>
+            <span>Fiber: {Math.round(fiber_g)}g</span>
+          </div>
+        )}
         <MacroBar label="Fat" current={fat_g} target={profile.daily_fat_target} color="bg-purple-500" />
       </div>
     </div>

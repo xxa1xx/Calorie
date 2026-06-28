@@ -23,7 +23,7 @@
 
 ## Step 2 — Run the Database Schema
 
-You need to run 4 SQL files in order. In your Supabase project:
+You need to run 5 SQL files in order. In your Supabase project:
 
 1. Click **SQL Editor** in the left sidebar
 2. Click **New query**
@@ -34,6 +34,8 @@ You need to run 4 SQL files in order. In your Supabase project:
 7. Open **`supabase/schema-v3.sql`** → paste → click **Run**
 8. Click **New query** again
 9. Open **`supabase/schema-v4.sql`** → paste → click **Run**
+10. Click **New query** again
+11. Open **`supabase/schema-v5.sql`** → paste → click **Run**
 
 Each should say "Success". If you see an error, check you're running them in order.
 
@@ -116,6 +118,27 @@ This is needed for password reset emails to work.
 
 ---
 
+## Step 7b — (Optional) Set Up Daily Email Summaries
+
+This sends you a daily email at 8pm with your calorie summary. Requires a free **Resend** account.
+
+1. Go to **resend.com** → sign up (free, no credit card)
+2. Click **API Keys** → **Create API Key** → copy it
+3. (For production) Add and verify your domain under **Domains**. For testing, emails send from `onboarding@resend.dev` to your own email only.
+4. In Netlify → **Environment variables**, add:
+
+| Variable | Value |
+|---|---|
+| `RESEND_API_KEY` | Your Resend API key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Found in Supabase → Settings → API → **service_role** key |
+| `PUBLIC_APP_URL` | Your Netlify URL (e.g. `https://my-app.netlify.app`) |
+
+5. In the app → **Settings** → turn on **Daily email summary**
+
+> **Note:** The service_role key has full database access. It's used only in the scheduled function running on Netlify's servers — never exposed to the browser.
+
+---
+
 ## Step 9 — Create Your Accounts
 
 1. Open the app at your Netlify URL
@@ -154,6 +177,18 @@ If you want a URL like `calories.yourdomain.com`:
 
 - **Meal Suggestions** — tap "Get Ideas" in the Suggestions tab
 - **Weekly Insights** — tap "Analyse Week" in the Insights tab
+
+---
+
+## Troubleshooting
+
+### Install as a Phone App
+
+CalorieAI is a Progressive Web App (PWA). You can install it on your phone like a native app:
+- **Android (Chrome):** tap the three-dot menu → "Add to Home Screen"
+- **iPhone (Safari):** tap the Share button → "Add to Home Screen"
+
+Once installed from your home screen, browser notifications work even when the app isn't open.
 
 ---
 

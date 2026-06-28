@@ -1,0 +1,17 @@
+{
+  "name": "CalorieAI",
+  "short_name": "CalorieAI",
+  "description": "AI-powered calorie and macro tracking",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
