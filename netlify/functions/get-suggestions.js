@@ -31,11 +31,21 @@ export const handler = async (event) => {
     ? recentLogs.slice(0, 10).map((l) => l.description).join(', ')
     : 'No recent history'
 
+  const glp1Section = profile.on_glp1 ? `
+GLP-1 medication context: This user is on a GLP-1 medication. Prioritise:
+- Small, protein-dense portions (aim for maximum protein per calorie)
+- Easy-to-digest foods that are gentle on the stomach
+- High nutrient density to compensate for lower overall volume
+- Good hydration (suggest water-rich foods or remind about fluids)
+- Avoid heavy, greasy, or very spicy foods that may worsen nausea
+- It is normal and expected that they may not hit their full calorie target` : ''
+
   const prompt = `You are a nutrition coach. Suggest 3 meal or snack options based on remaining daily nutrition needs.
 
-User goal: ${profile.goal} weight
+User goal: ${profile.goal} weight${profile.on_glp1 ? ' (on GLP-1 medication)' : ''}
 Remaining today: ${remaining.calories} kcal, ${remaining.protein_g}g protein, ${remaining.carbs_g}g carbs, ${remaining.fat_g}g fat
 Recent foods eaten: ${recentFoods}
+${glp1Section}
 
 Return exactly this JSON (no markdown, no code blocks):
 {

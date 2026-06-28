@@ -28,6 +28,7 @@ export default function Onboarding({ onComplete }) {
     goal_weight_kg: '',
     activity_level: 'moderate',
     goal: 'lose',
+    on_glp1: false,
   })
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
@@ -174,6 +175,34 @@ export default function Onboarding({ onComplete }) {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="label">Medication</label>
+                <button
+                  type="button"
+                  onClick={() => set('on_glp1', !form.on_glp1)}
+                  className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${form.on_glp1 ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:bg-gray-50'}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium text-sm">I'm on a GLP-1 medication</div>
+                      <div className="text-xs text-gray-500 mt-0.5">Ozempic, Wegovy, Mounjaro, Victoza, etc.</div>
+                    </div>
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${form.on_glp1 ? 'bg-primary-500 border-primary-500' : 'border-gray-300'}`}>
+                      {form.on_glp1 && (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                  </div>
+                </button>
+                {form.on_glp1 && (
+                  <p className="text-xs text-primary-700 bg-primary-50 rounded-lg p-2 mt-2">
+                    The AI will adjust its feedback and suggestions for GLP-1 users — celebrating protein intake, recommending small nutrient-dense portions, and understanding that eating below your calorie target is normal and healthy.
+                  </p>
+                )}
               </div>
             </>
           )}
