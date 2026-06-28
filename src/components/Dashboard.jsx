@@ -13,6 +13,8 @@ import QuickLog from './QuickLog'
 import CalorieChart from './CalorieChart'
 import WeightTracker from './WeightTracker'
 import Settings from './Settings'
+import DailyNotes from './DailyNotes'
+import RecipeLibrary from './RecipeLibrary'
 
 function sumLogs(logs) {
   return logs.reduce(
@@ -26,26 +28,47 @@ function sumLogs(logs) {
   )
 }
 
+function calcStreak(weeklyLogs) {
+  if (!weeklyLogs.length) return 0
+  const today = new Date().toISOString().split('T')[0]
+  const loggedDates = new Set(weeklyLogs.map((l) => l.date))
+  let streak = 0
+  let d = new Date()
+  while (true) {
+    const dateStr = d.toISOString().split('T')[0]
+    if (loggedDates.has(dateStr)) {
+      streak++
+      d.setDate(d.getDate() - 1)
+    } else if (dateStr === today) {
+      break
+    } else {
+      break
+    }
+  }
+  return streak
+}
+
 export default function Dashboard({ profile, onUpdateProfile }) {
   const { user, signOut } = useAuth()
   const [todayLogs, setTodayLogs] = useState([])
   const [weeklyLogs, setWeeklyLogs] = useState([])
   const [recentLogs, setRecentLogs] = useState([])
-  const [allLogs, setAllLogs] = useState([])
   const [activeTab, setActiveTab] = useState('today')
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
+  const [isWorkoutDay, setIsWorkoutDay] = useState(false)
+  const [streak, setStreak] = useState(0)
 
   const today = new Date().toISOString().split('T')[0]
 
   const loadData = useCallback(async () => {
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
     const { data } = await supabase
       .from('food_logs')
       .select('*')
       .eq('user_id', user.id)
-      .gte('date', sevenDaysAgo)
+      .gte('date', thirtyDaysAgo)
       .order('logged_at', { ascending: false })
 
     if (!data) return
@@ -62,7 +85,9 @@ export default function Dashboard({ profile, onUpdateProfile }) {
       byDate[log.date].fat_g += log.fat_g || 0
       byDate[log.date].descriptions.push(log.description)
     })
-    setWeeklyLogs(Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date)))
+    const sorted = Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date))
+    setWeeklyLogs(sorted)
+    setStreak(calcStreak(sorted))
     setLoading(false)
   }, [user.id, today])
 
@@ -101,6 +126,7 @@ export default function Dashboard({ profile, onUpdateProfile }) {
 
   const tabs = [
     { id: 'today', label: 'Today' },
+    { id: 'recipes', label: 'Recipes' },
     { id: 'progress', label: 'Progress' },
     { id: 'suggestions', label: 'Suggestions' },
     { id: 'insights', label: 'Insights' },
@@ -138,9 +164,7 @@ export default function Dashboard({ profile, onUpdateProfile }) {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`px-4 py-1.5 text-sm font-medium rounded-full transition-colors whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'bg-primary-600 text-white'
-                    : 'text-gray-600 hover:text-gray-900'
+                  activeTab === tab.id ? 'bg-primary-600 text-white' : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 {tab.label}
@@ -157,7 +181,13 @@ export default function Dashboard({ profile, onUpdateProfile }) {
           <>
             {activeTab === 'today' && (
               <>
-                <MacroProgress profile={currentProfile} todayTotals={todayTotals} />
+                <MacroProgress
+                  profile={currentProfile}
+                  todayTotals={todayTotals}
+                  isWorkoutDay={isWorkoutDay}
+                  streak={streak}
+                />
+                <DailyNotes onWorkoutDayChange={setIsWorkoutDay} />
                 <WaterTracker />
                 <QuickLog onLogged={handleFoodLogged} />
                 <FoodLogger profile={currentProfile} todayTotals={todayTotals} onLogged={handleFoodLogged} />
@@ -183,9 +213,13 @@ export default function Dashboard({ profile, onUpdateProfile }) {
               </>
             )}
 
+            {activeTab === 'recipes' && (
+              <RecipeLibrary onLogged={handleFoodLogged} />
+            )}
+
             {activeTab === 'progress' && (
               <>
-                <CalorieChart weeklyLogs={weeklyLogs} target={currentProfile.daily_calorie_target} />
+                <CalorieChart weeklyLogs={weeklyLogs.slice(0, 7)} target={currentProfile.daily_calorie_target} />
                 <WeightTracker profile={currentProfile} />
                 <div className="card">
                   <h2 className="text-lg font-semibold mb-2">Export Data</h2>
@@ -213,7 +247,7 @@ export default function Dashboard({ profile, onUpdateProfile }) {
             )}
 
             {activeTab === 'insights' && (
-              <WeeklyInsights profile={currentProfile} weeklyLogs={weeklyLogs} />
+              <WeeklyInsights profile={currentProfile} weeklyLogs={weeklyLogs.slice(0, 7)} />
             )}
 
             {activeTab === 'settings' && (

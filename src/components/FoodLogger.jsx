@@ -1,6 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, lazy, Suspense } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import FoodSearch from './FoodSearch'
+
+const BarcodeScanner = lazy(() => import('./BarcodeScanner'))
 
 async function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -31,9 +34,16 @@ function MacroField({ label, value, onChange, required }) {
   )
 }
 
+const TABS = [
+  { id: 'manual', label: 'Manual' },
+  { id: 'search', label: '🔍 Search' },
+  { id: 'scan', label: '📷 Scan' },
+  { id: 'ai', label: '✨ AI' },
+]
+
 export default function FoodLogger({ profile, todayTotals, onLogged }) {
   const { user } = useAuth()
-  const [mode, setMode] = useState('manual') // 'manual' | 'ai'
+  const [mode, setMode] = useState('manual')
   const [description, setDescription] = useState('')
   const [macros, setMacros] = useState(EMPTY_MACROS)
   const [image, setImage] = useState(null)
@@ -67,7 +77,6 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
     setError('')
   }
 
-  // ── Manual entry ───────────────────────────────────────────────────────────
   const handleManual = async (e) => {
     e.preventDefault()
     if (!description.trim() || !macros.calories) return
@@ -90,7 +99,6 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
     const { error: dbError } = await supabase.from('food_logs').insert(entry)
     if (dbError) { setError(dbError.message); setLoading(false); return }
 
-    // Save to favourites
     await supabase.from('favorites').upsert(
       { user_id: user.id, description: entry.description, calories: entry.calories,
         protein_g: entry.protein_g, carbs_g: entry.carbs_g, fat_g: entry.fat_g,
@@ -103,7 +111,6 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
     setLoading(false)
   }
 
-  // ── AI entry ───────────────────────────────────────────────────────────────
   const handleAI = async (e) => {
     e.preventDefault()
     if ((!description.trim() && !image) || loading) return
@@ -168,25 +175,21 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
     <div className="card">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Log Food</h2>
-        <div className="flex rounded-lg bg-gray-100 p-0.5">
-          <button
-            type="button"
-            onClick={() => switchMode('manual')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${mode === 'manual' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
-          >
-            Manual
-          </button>
-          <button
-            type="button"
-            onClick={() => switchMode('ai')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${mode === 'ai' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
-          >
-            ✨ AI
-          </button>
-        </div>
       </div>
 
-      {/* ── Manual Mode ── */}
+      <div className="flex rounded-lg bg-gray-100 p-0.5 mb-4 overflow-x-auto">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => switchMode(tab.id)}
+            className={`flex-1 min-w-max px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${mode === tab.id ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {mode === 'manual' && (
         <form onSubmit={handleManual} className="space-y-3">
           <div>
@@ -221,7 +224,16 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
         </form>
       )}
 
-      {/* ── AI Mode ── */}
+      {mode === 'search' && (
+        <FoodSearch onLogged={(entry) => { onLogged(entry) }} />
+      )}
+
+      {mode === 'scan' && (
+        <Suspense fallback={<div className="text-center py-6 text-gray-400 text-sm">Loading scanner...</div>}>
+          <BarcodeScanner onLogged={(entry) => { onLogged(entry) }} />
+        </Suspense>
+      )}
+
       {mode === 'ai' && (
         <form onSubmit={handleAI} className="space-y-3">
           {image && (

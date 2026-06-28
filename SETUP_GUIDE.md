@@ -23,7 +23,7 @@
 
 ## Step 2 — Run the Database Schema
 
-You need to run 3 SQL files in order. In your Supabase project:
+You need to run 4 SQL files in order. In your Supabase project:
 
 1. Click **SQL Editor** in the left sidebar
 2. Click **New query**
@@ -32,6 +32,8 @@ You need to run 3 SQL files in order. In your Supabase project:
 5. Open **`supabase/schema-v2.sql`** → paste → click **Run**
 6. Click **New query** again
 7. Open **`supabase/schema-v3.sql`** → paste → click **Run**
+8. Click **New query** again
+9. Open **`supabase/schema-v4.sql`** → paste → click **Run**
 
 Each should say "Success". If you see an error, check you're running them in order.
 
@@ -162,7 +164,9 @@ If you want a URL like `calories.yourdomain.com`:
 | Build fails on Netlify | Check the build log. Usually a misspelled env variable name. |
 | "Missing Supabase environment variables" | `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` is missing or misspelled in Netlify |
 | "Failed to analyse food" | Check `ANTHROPIC_API_KEY` in Netlify. Make sure billing is set up at console.anthropic.com |
-| Blank screen after login | The SQL schemas didn't run. Re-run all 3 files in Supabase SQL Editor |
+| Blank screen after login | The SQL schemas didn't run. Re-run all 4 files in Supabase SQL Editor |
+| Recipes or Daily Notes not saving | `schema-v4.sql` was not run. Run it in Supabase SQL Editor. |
+| Barcode scanner asks for camera | Allow camera access in your browser when prompted |
 | Password reset links don't work | You haven't added the Netlify URL to Supabase → Authentication → URL Configuration (Step 8) |
 | Confirmation email not arriving | Check spam. In Supabase → Authentication → Email Templates you can resend. |
 

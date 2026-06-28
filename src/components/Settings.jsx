@@ -42,6 +42,7 @@ export default function Settings({ profile, onSaved }) {
     activity_level: profile.activity_level || 'moderate',
     goal: profile.goal || 'lose',
     dietary_options: profile.dietary_options || [],
+    workout_calorie_bonus: profile.workout_calorie_bonus ?? 200,
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -143,6 +144,23 @@ export default function Settings({ profile, onSaved }) {
                 <span className="text-gray-400 ml-2">{opt.desc}</span>
               </button>
             ))}
+          </div>
+        </Field>
+      </Section>
+
+      <Section title="Workout Settings">
+        <Field label="Extra calories on workout days (kcal)">
+          <div className="flex items-center gap-3">
+            <input
+              className="input w-32"
+              type="number"
+              min="0"
+              max="1000"
+              step="50"
+              value={form.workout_calorie_bonus}
+              onChange={(e) => set('workout_calorie_bonus', parseInt(e.target.value) || 0)}
+            />
+            <p className="text-xs text-gray-500">Added to your daily target when you mark a workout day</p>
           </div>
         </Field>
       </Section>

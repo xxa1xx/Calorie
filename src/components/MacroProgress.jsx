@@ -1,7 +1,7 @@
 import { getProgressColor } from '../lib/calculations'
 
 function MacroBar({ label, current, target, color, unit = 'g' }) {
-  const pct = Math.min(100, Math.round((current / target) * 100))
+  const pct = Math.min(100, Math.round((current / Math.max(1, target)) * 100))
   const barColor = pct >= 100 ? 'bg-red-500' : color
 
   return (
@@ -20,25 +20,38 @@ function MacroBar({ label, current, target, color, unit = 'g' }) {
   )
 }
 
-export default function MacroProgress({ profile, todayTotals }) {
+export default function MacroProgress({ profile, todayTotals, isWorkoutDay, streak }) {
   const { calories = 0, protein_g = 0, carbs_g = 0, fat_g = 0 } = todayTotals || {}
-  const calPct = Math.round((calories / profile.daily_calorie_target) * 100)
+  const workoutBonus = isWorkoutDay ? (profile.workout_calorie_bonus || 200) : 0
+  const effectiveTarget = profile.daily_calorie_target + workoutBonus
+  const calPct = Math.round((calories / Math.max(1, effectiveTarget)) * 100)
+  const remaining = Math.max(0, effectiveTarget - calories)
 
   return (
     <div className="card">
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Today's Progress</h2>
-        <span className={`text-sm font-medium px-2.5 py-1 rounded-full ${calPct >= 100 ? 'bg-red-100 text-red-700' : 'bg-primary-100 text-primary-700'}`}>
-          {calPct}% of goal
-        </span>
+        <div className="flex items-center gap-2">
+          {streak > 0 && (
+            <span className="text-xs bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full font-medium">
+              🔥 {streak} day streak
+            </span>
+          )}
+          <span className={`text-sm font-medium px-2.5 py-1 rounded-full ${calPct >= 100 ? 'bg-red-100 text-red-700' : 'bg-primary-100 text-primary-700'}`}>
+            {calPct}%
+          </span>
+        </div>
       </div>
 
       <div className="text-center py-4 mb-5 bg-gray-50 rounded-xl">
         <div className="text-4xl font-bold text-gray-900">{Math.round(calories)}</div>
-        <div className="text-sm text-gray-500 mt-1">of {profile.daily_calorie_target} kcal</div>
-        <div className="text-sm text-gray-600 mt-1">
-          {Math.max(0, profile.daily_calorie_target - calories)} kcal remaining
+        <div className="text-sm text-gray-500 mt-1">
+          of {effectiveTarget} kcal
+          {isWorkoutDay && workoutBonus > 0 && (
+            <span className="ml-1.5 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">💪 +{workoutBonus}</span>
+          )}
         </div>
+        <div className="text-sm text-gray-600 mt-1">{remaining} kcal remaining</div>
       </div>
 
       <div className="space-y-4">
