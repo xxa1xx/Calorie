@@ -106,6 +106,7 @@ export default function Settings({ profile, onSaved }) {
       activity_level: form.activity_level,
       goal: form.goal,
       weekly_loss_lbs: parseFloat(form.weekly_loss_lbs) || 1,
+      dietary_options: form.dietary_options,
     }
     const t = calculateDailyTargets(pd)
     set('calorie_target', String(t.daily_calorie_target))

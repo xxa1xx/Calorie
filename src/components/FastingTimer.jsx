@@ -175,15 +175,6 @@ export default function FastingTimer() {
               <p className="text-sm text-gray-500">
                 Tap Start to begin your {targetHours}-hour fast. You'll get a browser notification when your eating window opens.
               </p>
-              <div className="grid grid-cols-3 gap-2 text-xs text-center">
-                {[12, 14, 16, 18, 20, 24].map((h) => (
-                  <button key={h} type="button"
-                    onClick={() => { setNewTarget(h); setTargetHours(h); saveMeta({ fast_target_hours: h }) }}
-                    className={`py-1.5 rounded-lg border transition-colors ${targetHours === h ? 'border-primary-500 bg-primary-50 text-primary-700 font-medium' : 'border-gray-200 text-gray-500'}`}>
-                    {h}h
-                  </button>
-                ))}
-              </div>
               <button type="button" onClick={startFast} className="btn-primary w-full">Start Fast Now</button>
             </>
           )}

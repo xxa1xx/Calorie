@@ -23,6 +23,9 @@ export default function MacroProgress({ profile, todayTotals, isWorkoutDay, stre
   const remaining = Math.max(0, effectiveTarget - calories)
   const netCarbs = Math.max(0, Math.round(carbs_g - fiber_g))
 
+  // DRI fiber targets: 38g men, 25g women/other (Institute of Medicine)
+  const fiberTarget = profile.gender === 'male' ? 38 : 25
+
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-4">
@@ -56,14 +59,13 @@ export default function MacroProgress({ profile, todayTotals, isWorkoutDay, stre
       <div className="space-y-4">
         <MacroBar label="Protein" current={protein_g} target={profile.daily_protein_target} color="bg-blue-500" />
         <MacroBar label="Carbs" current={carbs_g} target={profile.daily_carbs_target} color="bg-yellow-500" />
-        {fiber_g > 0 && (
-          <div className="flex items-center gap-2 text-xs text-gray-500 -mt-2 pl-1">
-            <span>Net carbs: <strong className="text-gray-700">{netCarbs}g</strong></span>
-            <span className="text-gray-300">·</span>
-            <span>Fiber: {Math.round(fiber_g)}g</span>
+        {carbs_g > 0 && fiber_g > 0 && (
+          <div className="text-xs text-gray-400 -mt-2 pl-1">
+            Net carbs: <strong className="text-gray-600">{netCarbs}g</strong>
           </div>
         )}
         <MacroBar label="Fat" current={fat_g} target={profile.daily_fat_target} color="bg-purple-500" />
+        <MacroBar label="Fiber" current={fiber_g} target={fiberTarget} color="bg-green-500" />
       </div>
     </div>
   )

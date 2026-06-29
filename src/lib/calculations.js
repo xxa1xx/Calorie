@@ -27,32 +27,74 @@ export function calculateDailyTargets(profile) {
   )
 
   const tdee = Math.round(bmr * ACTIVITY_MULTIPLIERS[profile.activity_level])
-  // Gender-aware minimum: 1500 kcal for males, 1200 for females/other
-  // (NHS/Mayo Clinic guidance: don't go below these without medical supervision)
-  const minCalories = profile.gender === 'male' ? 1500 : 1200
-  // If weekly_loss_lbs is set, use it to compute the deficit (0.5 lbs/wk ≈ 250 kcal/day)
+
+  const dietary = profile.dietary_options || []
+  const isBariatric = dietary.includes('bariatric')
+  const isGLP1 = dietary.includes('glp1')
+  const isKeto = dietary.includes('keto')
+  const isDiabetic = dietary.includes('diabetic')
+  const isHighProtein = dietary.includes('high_protein')
+
+  // Calorie floor by medical context
+  // Bariatric: 600 kcal (ASMBS post-op early-stage guidance)
+  // GLP-1: 800 kcal (clinically monitored appetite suppression)
+  // Standard: 1500 male / 1200 female (NHS/Mayo Clinic minimum without medical supervision)
+  let minCalories = profile.gender === 'male' ? 1500 : 1200
+  if (isBariatric) minCalories = 600
+  else if (isGLP1) minCalories = 800
+
   let goalAdj = GOAL_ADJUSTMENTS[profile.goal] ?? 0
   if (profile.goal === 'lose' && profile.weekly_loss_lbs) {
     goalAdj = -Math.round(parseFloat(profile.weekly_loss_lbs) * 500)
   }
   const dailyCalories = Math.max(minCalories, tdee + goalAdj)
 
-  // Protein: 1.8g/kg supports muscle retention during a deficit (ISSN position stand 1.6–2.2g/kg)
-  // Capped at 35% of calories so it can't crowd out fat and carbs at low calorie targets
-  let proteinG = Math.round(1.8 * profile.current_weight_kg)
-  let proteinCal = proteinG * 4
-  if (proteinCal > dailyCalories * 0.35) {
-    proteinCal = Math.round(dailyCalories * 0.35)
-    proteinG = Math.round(proteinCal / 4)
+  let proteinG, fatG, carbsG
+
+  if (isKeto) {
+    // Therapeutic ketosis: ~70% fat, ~25% protein, net carbs hard-capped at 50g
+    proteinG = Math.round((dailyCalories * 0.25) / 4)
+    fatG = Math.round((dailyCalories * 0.70) / 9)
+    carbsG = Math.min(50, Math.round((dailyCalories * 0.05) / 4))
+
+  } else if (isBariatric) {
+    // ASMBS/SAGES guidelines: protein-first, ≥60–80g/day minimum post-op
+    // Protein allowed up to 50% of calories since total intake is very low
+    const minProteinG = 70
+    proteinG = Math.max(minProteinG, Math.round(1.6 * profile.current_weight_kg))
+    let proteinCal = proteinG * 4
+    if (proteinCal > dailyCalories * 0.50) {
+      proteinCal = Math.round(dailyCalories * 0.50)
+      proteinG = Math.round(proteinCal / 4)
+    }
+    const fatCal = Math.round(dailyCalories * 0.25)
+    fatG = Math.round(fatCal / 9)
+    carbsG = Math.round(Math.max(0, dailyCalories - proteinG * 4 - fatCal) / 4)
+
+  } else if (isDiabetic) {
+    // ADA 2024 Standards of Care: individualized carb reduction for glycaemic management
+    // ~30% carbs / 30% protein / 40% fat is consistent with a moderate low-carb approach
+    proteinG = Math.round((dailyCalories * 0.30) / 4)
+    fatG = Math.round((dailyCalories * 0.40) / 9)
+    carbsG = Math.round(Math.max(0, dailyCalories - proteinG * 4 - fatG * 9) / 4)
+
+  } else {
+    // Standard / GLP-1 / high-protein path
+    // Protein: 1.8g/kg (ISSN 1.6–2.2g/kg for muscle retention during deficit)
+    // High-protein flag: 2.0g/kg, up to 40% of calories
+    let targetProteinG = Math.round(1.8 * profile.current_weight_kg)
+    if (isHighProtein) targetProteinG = Math.max(targetProteinG, Math.round(2.0 * profile.current_weight_kg))
+    let proteinCal = targetProteinG * 4
+    const maxProteinPct = isHighProtein ? 0.40 : 0.35
+    if (proteinCal > dailyCalories * maxProteinPct) {
+      proteinCal = Math.round(dailyCalories * maxProteinPct)
+      targetProteinG = Math.round(proteinCal / 4)
+    }
+    proteinG = targetProteinG
+    const fatCal = Math.round(dailyCalories * 0.27)
+    fatG = Math.round(fatCal / 9)
+    carbsG = Math.round(Math.max(0, dailyCalories - proteinG * 4 - fatCal) / 4)
   }
-
-  // Fat: 27% of calories (within the 20–35% AMDR; 27% is a solid midpoint)
-  const fatCal = Math.round(dailyCalories * 0.27)
-  const fatG = Math.round(fatCal / 9)
-
-  // Carbs: remainder, floored at 0
-  const carbsCal = Math.max(0, dailyCalories - proteinCal - fatCal)
-  const carbsG = Math.round(carbsCal / 4)
 
   return {
     daily_calorie_target: dailyCalories,
