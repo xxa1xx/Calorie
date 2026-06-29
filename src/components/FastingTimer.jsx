@@ -124,10 +124,10 @@ export default function FastingTimer() {
             {editingTarget ? (
               <div className="flex items-center gap-2">
                 <input
-                  type="number" min="1" max="48" step="0.5"
+                  type="number" min="1" max="48" step="1"
                   className="input text-sm w-20 py-1"
                   value={newTarget}
-                  onChange={(e) => setNewTarget(parseFloat(e.target.value))}
+                  onChange={(e) => setNewTarget(parseInt(e.target.value))}
                 />
                 <span className="text-sm text-gray-500">h</span>
                 <button onClick={saveTarget} className="text-sm text-primary-600 font-medium">Save</button>

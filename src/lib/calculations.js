@@ -30,7 +30,12 @@ export function calculateDailyTargets(profile) {
   // Gender-aware minimum: 1500 kcal for males, 1200 for females/other
   // (NHS/Mayo Clinic guidance: don't go below these without medical supervision)
   const minCalories = profile.gender === 'male' ? 1500 : 1200
-  const dailyCalories = Math.max(minCalories, tdee + GOAL_ADJUSTMENTS[profile.goal])
+  // If weekly_loss_lbs is set, use it to compute the deficit (0.5 lbs/wk ≈ 250 kcal/day)
+  let goalAdj = GOAL_ADJUSTMENTS[profile.goal] ?? 0
+  if (profile.goal === 'lose' && profile.weekly_loss_lbs) {
+    goalAdj = -Math.round(parseFloat(profile.weekly_loss_lbs) * 500)
+  }
+  const dailyCalories = Math.max(minCalories, tdee + goalAdj)
 
   // Protein: 1.8g/kg supports muscle retention during a deficit (ISSN position stand 1.6–2.2g/kg)
   // Capped at 35% of calories so it can't crowd out fat and carbs at low calorie targets

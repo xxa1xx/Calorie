@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { kgToLbs, lbsToKg, cmToFtIn } from '../lib/units'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ReferenceLine, ResponsiveContainer,
@@ -23,7 +24,7 @@ const CustomTooltip = ({ active, payload }) => {
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-md p-3 text-sm">
       <p className="text-gray-500">{payload[0].payload.label}</p>
-      <p className="font-semibold text-gray-900">{payload[0].value} kg</p>
+      <p className="font-semibold text-gray-900">{payload[0].value} lbs</p>
     </div>
   )
 }
@@ -49,13 +50,13 @@ export default function WeightTracker({ profile, onWeightLogged }) {
 
   const handleLog = async (e) => {
     e.preventDefault()
-    const weight = parseFloat(input)
-    if (!weight || weight < 20 || weight > 500) return
+    const weightLbs = parseFloat(input)
+    if (!weightLbs || weightLbs < 50 || weightLbs > 800) return
 
     setSaving(true)
     const { data, error } = await supabase
       .from('weight_logs')
-      .upsert({ user_id: user.id, date: today, weight_kg: weight, logged_at: new Date().toISOString() },
+      .upsert({ user_id: user.id, date: today, weight_kg: lbsToKg(weightLbs), logged_at: new Date().toISOString() },
                { onConflict: 'user_id,date' })
       .select()
       .single()
@@ -65,32 +66,38 @@ export default function WeightTracker({ profile, onWeightLogged }) {
         const without = prev.filter((l) => l.date !== today)
         return [...without, data].sort((a, b) => a.date.localeCompare(b.date))
       })
-      onWeightLogged?.(weight)
+      onWeightLogged?.(data.weight_kg)
     }
     setInput('')
     setSaving(false)
   }
 
-  const chartData = logs.map((l) => ({ label: formatDate(l.date), weight: l.weight_kg }))
+  const chartData = logs.map((l) => ({ label: formatDate(l.date), weight: kgToLbs(l.weight_kg) }))
 
   const latest = logs[logs.length - 1]
   const first = logs[0]
-  const change = latest && first && latest.date !== first.date
-    ? (latest.weight_kg - first.weight_kg).toFixed(1)
+  const changeLbs = latest && first && latest.date !== first.date
+    ? (kgToLbs(latest.weight_kg) - kgToLbs(first.weight_kg)).toFixed(1)
     : null
 
+  const goalLbs = kgToLbs(profile.goal_weight_kg)
+  const startLbs = kgToLbs(profile.current_weight_kg)
+
   const yMin = logs.length > 0
-    ? Math.floor(Math.min(...logs.map((l) => l.weight_kg), profile.goal_weight_kg) - 1)
+    ? Math.floor(Math.min(...logs.map((l) => kgToLbs(l.weight_kg)), goalLbs) - 2)
     : undefined
   const yMax = logs.length > 0
-    ? Math.ceil(Math.max(...logs.map((l) => l.weight_kg), profile.current_weight_kg) + 1)
+    ? Math.ceil(Math.max(...logs.map((l) => kgToLbs(l.weight_kg)), startLbs) + 2)
     : undefined
 
-  const currentWeight = latest?.weight_kg || profile.current_weight_kg
+  const currentWeightKg = latest?.weight_kg || profile.current_weight_kg
+  const currentWeightLbs = kgToLbs(currentWeightKg)
   const heightM = (profile.height_cm || 170) / 100
-  const bmi = currentWeight / (heightM * heightM)
+  const bmi = currentWeightKg / (heightM * heightM)
   const bmiRounded = Math.round(bmi * 10) / 10
   const { label: bmiLabel, color: bmiColor } = bmiCategory(bmi)
+
+  const { ft, inches } = cmToFtIn(profile.height_cm || 170)
 
   return (
     <div className="card space-y-4">
@@ -98,10 +105,10 @@ export default function WeightTracker({ profile, onWeightLogged }) {
         <h2 className="text-lg font-semibold">Weight</h2>
         {latest && (
           <div className="text-right">
-            <div className="text-xl font-bold text-gray-900">{latest.weight_kg} kg</div>
-            {change !== null && (
-              <div className={`text-xs font-medium ${parseFloat(change) < 0 ? 'text-primary-600' : 'text-red-500'}`}>
-                {parseFloat(change) > 0 ? '+' : ''}{change} kg overall
+            <div className="text-xl font-bold text-gray-900">{kgToLbs(latest.weight_kg)} lbs</div>
+            {changeLbs !== null && (
+              <div className={`text-xs font-medium ${parseFloat(changeLbs) < 0 ? 'text-primary-600' : 'text-red-500'}`}>
+                {parseFloat(changeLbs) > 0 ? '+' : ''}{changeLbs} lbs overall
               </div>
             )}
           </div>
@@ -109,13 +116,13 @@ export default function WeightTracker({ profile, onWeightLogged }) {
       </div>
 
       <div className="flex gap-3 flex-wrap text-sm text-gray-500">
-        <span>Start: {profile.current_weight_kg} kg</span>
+        <span>Start: {startLbs} lbs</span>
         <span className="text-gray-300">·</span>
-        <span>Goal: {profile.goal_weight_kg} kg</span>
+        <span>Goal: {goalLbs} lbs</span>
         {latest && (
           <>
             <span className="text-gray-300">·</span>
-            <span>{Math.abs(latest.weight_kg - profile.goal_weight_kg).toFixed(1)} kg to go</span>
+            <span>{Math.abs(kgToLbs(latest.weight_kg) - goalLbs).toFixed(1)} lbs to go</span>
           </>
         )}
       </div>
@@ -134,8 +141,8 @@ export default function WeightTracker({ profile, onWeightLogged }) {
         </div>
         <div className="flex-1" />
         <div className="text-xs text-gray-400 text-right">
-          <div>Height: {profile.height_cm} cm</div>
-          <div>Weight: {currentWeight} kg</div>
+          <div>Height: {ft}'{inches}"</div>
+          <div>Weight: {currentWeightLbs} lbs</div>
         </div>
       </div>
 
@@ -146,7 +153,7 @@ export default function WeightTracker({ profile, onWeightLogged }) {
             <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
             <YAxis domain={[yMin, yMax]} tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
             <Tooltip content={<CustomTooltip />} />
-            <ReferenceLine y={profile.goal_weight_kg} stroke="#22c55e" strokeDasharray="4 2" strokeWidth={1.5}
+            <ReferenceLine y={goalLbs} stroke="#22c55e" strokeDasharray="4 2" strokeWidth={1.5}
               label={{ value: 'Goal', position: 'right', fontSize: 10, fill: '#22c55e' }} />
             <Line type="monotone" dataKey="weight" stroke="#6366f1" strokeWidth={2} dot={{ r: 3, fill: '#6366f1' }} activeDot={{ r: 5 }} />
           </LineChart>
@@ -158,11 +165,11 @@ export default function WeightTracker({ profile, onWeightLogged }) {
       <form onSubmit={handleLog} className="flex gap-2">
         <input
           type="number"
-          step="0.1"
+          step="0.5"
           className="input flex-1"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={todayLog ? `Today: ${todayLog.weight_kg} kg` : "Today's weight (kg)"}
+          placeholder={todayLog ? `Today: ${kgToLbs(todayLog.weight_kg)} lbs` : "Today's weight (lbs)"}
         />
         <button type="submit" className="btn-primary px-4" disabled={!input || saving}>
           {saving ? '...' : 'Log'}

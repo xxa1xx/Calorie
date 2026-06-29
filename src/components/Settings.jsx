@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { calculateDailyTargets } from '../lib/calculations'
 import { DIETARY_OPTIONS } from '../lib/dietary'
 import { requestPermission, getPermission, scheduleDailyReminder } from '../lib/notifications'
+import { kgToLbs, lbsToKg, cmToFtIn, ftInToCm } from '../lib/units'
 
 const ACTIVITY_OPTIONS = [
   { value: 'sedentary', label: 'Sedentary', desc: 'Desk job, little exercise' },
@@ -33,15 +34,21 @@ function Field({ label, children }) {
 
 export default function Settings({ profile, onSaved }) {
   const { user } = useAuth()
+
+  const { ft: initFt, inches: initIn } = profile.height_cm ? cmToFtIn(profile.height_cm) : { ft: '', inches: '' }
+
   const [form, setForm] = useState({
     name: profile.name || '',
     age: profile.age || '',
     gender: profile.gender || 'male',
-    height_cm: profile.height_cm || '',
-    current_weight_kg: profile.current_weight_kg || '',
-    goal_weight_kg: profile.goal_weight_kg || '',
+    height_ft: profile.height_cm ? String(initFt) : '',
+    height_in: profile.height_cm ? String(initIn) : '',
+    current_weight_lbs: profile.current_weight_kg ? String(kgToLbs(profile.current_weight_kg)) : '',
+    goal_weight_lbs: profile.goal_weight_kg ? String(kgToLbs(profile.goal_weight_kg)) : '',
     activity_level: profile.activity_level || 'moderate',
     goal: profile.goal || 'lose',
+    weekly_loss_lbs: profile.weekly_loss_lbs || 1,
+    calorie_target: profile.daily_calorie_target ? String(profile.daily_calorie_target) : '',
     dietary_options: profile.dietary_options || [],
     workout_calorie_bonus: profile.workout_calorie_bonus ?? 200,
     email_summary: profile.email_summary ?? false,
@@ -86,20 +93,60 @@ export default function Settings({ profile, onSaved }) {
     scheduleDailyReminder(false, null)
   }
 
+  const recalcCalories = () => {
+    const weightLbs = parseFloat(form.current_weight_lbs)
+    const goalLbs = parseFloat(form.goal_weight_lbs)
+    if (!form.height_ft || !weightLbs || !goalLbs || !form.age) return
+    const pd = {
+      gender: form.gender,
+      age: parseInt(form.age),
+      height_cm: ftInToCm(form.height_ft, form.height_in),
+      current_weight_kg: lbsToKg(weightLbs),
+      goal_weight_kg: lbsToKg(goalLbs),
+      activity_level: form.activity_level,
+      goal: form.goal,
+      weekly_loss_lbs: parseFloat(form.weekly_loss_lbs) || 1,
+    }
+    const t = calculateDailyTargets(pd)
+    set('calorie_target', String(t.daily_calorie_target))
+  }
+
   const handleSave = async () => {
     setSaving(true)
     setError('')
 
     const profileData = {
-      ...form,
+      name: form.name,
       age: parseInt(form.age),
-      height_cm: parseFloat(form.height_cm),
-      current_weight_kg: parseFloat(form.current_weight_kg),
-      goal_weight_kg: parseFloat(form.goal_weight_kg),
+      gender: form.gender,
+      height_cm: ftInToCm(form.height_ft, form.height_in),
+      current_weight_kg: lbsToKg(parseFloat(form.current_weight_lbs)),
+      goal_weight_kg: lbsToKg(parseFloat(form.goal_weight_lbs)),
+      activity_level: form.activity_level,
+      goal: form.goal,
+      weekly_loss_lbs: parseFloat(form.weekly_loss_lbs) || 1,
+      dietary_options: form.dietary_options,
       workout_calorie_bonus: parseInt(form.workout_calorie_bonus) || 0,
+      email_summary: form.email_summary,
     }
 
     const targets = calculateDailyTargets(profileData)
+
+    // Apply manual calorie override and re-split macros proportionally
+    const customCal = parseInt(form.calorie_target)
+    if (customCal > 0 && customCal !== targets.daily_calorie_target) {
+      targets.daily_calorie_target = customCal
+      let proteinG = Math.round(1.8 * profileData.current_weight_kg)
+      let proteinCal = proteinG * 4
+      if (proteinCal > customCal * 0.35) {
+        proteinCal = Math.round(customCal * 0.35)
+        proteinG = Math.round(proteinCal / 4)
+      }
+      const fatCal = Math.round(customCal * 0.27)
+      targets.daily_protein_target = proteinG
+      targets.daily_fat_target = Math.round(fatCal / 9)
+      targets.daily_carbs_target = Math.round(Math.max(0, customCal - proteinCal - fatCal) / 4)
+    }
 
     const { error: dbError } = await supabase
       .from('profiles')
@@ -127,8 +174,15 @@ export default function Settings({ profile, onSaved }) {
           <Field label="Age">
             <input className="input" type="number" value={form.age} onChange={(e) => set('age', e.target.value)} min="10" max="120" />
           </Field>
-          <Field label="Height (cm)">
-            <input className="input" type="number" value={form.height_cm} onChange={(e) => set('height_cm', e.target.value)} />
+          <Field label="Height">
+            <div className="flex gap-1.5 items-center">
+              <input className="input w-16 text-center" type="number" min="3" max="8" value={form.height_ft}
+                onChange={(e) => set('height_ft', e.target.value)} placeholder="5" />
+              <span className="text-sm text-gray-500">ft</span>
+              <input className="input w-16 text-center" type="number" min="0" max="11" value={form.height_in}
+                onChange={(e) => set('height_in', e.target.value)} placeholder="10" />
+              <span className="text-sm text-gray-500">in</span>
+            </div>
           </Field>
         </div>
         <Field label="Gender">
@@ -145,11 +199,13 @@ export default function Settings({ profile, onSaved }) {
 
       <Section title="Weight & Goal">
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Current Weight (kg)">
-            <input className="input" type="number" step="0.1" value={form.current_weight_kg} onChange={(e) => set('current_weight_kg', e.target.value)} />
+          <Field label="Current Weight (lbs)">
+            <input className="input" type="number" step="0.5" value={form.current_weight_lbs}
+              onChange={(e) => set('current_weight_lbs', e.target.value)} />
           </Field>
-          <Field label="Goal Weight (kg)">
-            <input className="input" type="number" step="0.1" value={form.goal_weight_kg} onChange={(e) => set('goal_weight_kg', e.target.value)} />
+          <Field label="Goal Weight (lbs)">
+            <input className="input" type="number" step="0.5" value={form.goal_weight_lbs}
+              onChange={(e) => set('goal_weight_lbs', e.target.value)} />
           </Field>
         </div>
         <Field label="Goal">
@@ -162,6 +218,18 @@ export default function Settings({ profile, onSaved }) {
             ))}
           </div>
         </Field>
+        {form.goal === 'lose' && (
+          <Field label="Weekly loss goal">
+            <div className="grid grid-cols-4 gap-2">
+              {[0.5, 1, 1.5, 2].map((rate) => (
+                <button key={rate} type="button" onClick={() => set('weekly_loss_lbs', rate)}
+                  className={`py-2 rounded-lg border text-sm font-medium transition-colors ${form.weekly_loss_lbs === rate ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-300 text-gray-600'}`}>
+                  {rate} lb/wk
+                </button>
+              ))}
+            </div>
+          </Field>
+        )}
         <Field label="Activity Level">
           <div className="space-y-1.5">
             {ACTIVITY_OPTIONS.map((opt) => (
@@ -172,6 +240,18 @@ export default function Settings({ profile, onSaved }) {
               </button>
             ))}
           </div>
+        </Field>
+        <Field label="Daily Calorie Target (kcal)">
+          <div className="flex gap-2">
+            <input className="input flex-1" type="number" min="800" max="9999" step="50"
+              value={form.calorie_target}
+              onChange={(e) => set('calorie_target', e.target.value)} />
+            <button type="button" onClick={recalcCalories}
+              className="btn-secondary text-xs px-3 whitespace-nowrap">
+              ↺ Recalculate
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Edit to set a custom target, or tap Recalculate to compute from your stats.</p>
         </Field>
       </Section>
 

@@ -237,13 +237,8 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
             <MacroField label="Protein (g)" value={macros.protein_g} onChange={(v) => setMacro('protein_g', v)} />
             <MacroField label="Carbs (g)" value={macros.carbs_g} onChange={(v) => setMacro('carbs_g', v)} />
             <MacroField label="Fat (g)" value={macros.fat_g} onChange={(v) => setMacro('fat_g', v)} />
+            <MacroField label="Fiber (g)" value={macros.fiber_g} onChange={(v) => setMacro('fiber_g', v)} />
           </div>
-          <details className="text-xs text-gray-400">
-            <summary className="cursor-pointer hover:text-gray-600">+ Fiber</summary>
-            <div className="mt-2 w-1/2">
-              <MacroField label="Fiber (g)" value={macros.fiber_g} onChange={(v) => setMacro('fiber_g', v)} />
-            </div>
-          </details>
 
           {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{error}</p>}
 

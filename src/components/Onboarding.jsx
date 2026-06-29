@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { calculateDailyTargets } from '../lib/calculations'
 import { DIETARY_OPTIONS } from '../lib/dietary'
+import { lbsToKg, ftInToCm } from '../lib/units'
 
 const STEPS = ['personal', 'body', 'goals', 'dietary']
 
@@ -24,9 +25,10 @@ export default function Onboarding({ onComplete }) {
     name: '',
     age: '',
     gender: 'male',
-    height_cm: '',
-    current_weight_kg: '',
-    goal_weight_kg: '',
+    height_ft: '',
+    height_in: '',
+    current_weight_lbs: '',
+    goal_weight_lbs: '',
     activity_level: 'moderate',
     goal: 'lose',
     dietary_options: [],
@@ -57,11 +59,16 @@ export default function Onboarding({ onComplete }) {
     setError('')
 
     const profileData = {
-      ...form,
+      name: form.name,
       age: parseInt(form.age),
-      height_cm: parseFloat(form.height_cm),
-      current_weight_kg: parseFloat(form.current_weight_kg),
-      goal_weight_kg: parseFloat(form.goal_weight_kg),
+      gender: form.gender,
+      height_cm: ftInToCm(form.height_ft, form.height_in),
+      current_weight_kg: lbsToKg(parseFloat(form.current_weight_lbs)),
+      goal_weight_kg: lbsToKg(parseFloat(form.goal_weight_lbs)),
+      activity_level: form.activity_level,
+      goal: form.goal,
+      dietary_options: form.dietary_options,
+      weekly_loss_lbs: 1.0,
     }
 
     const targets = calculateDailyTargets(profileData)
@@ -81,7 +88,7 @@ export default function Onboarding({ onComplete }) {
 
   const isStepValid = () => {
     if (step === 0) return form.name && form.age && form.gender
-    if (step === 1) return form.height_cm && form.current_weight_kg && form.goal_weight_kg
+    if (step === 1) return form.height_ft && form.current_weight_lbs && form.goal_weight_lbs
     return true // goals and dietary are always valid
   }
 
@@ -132,16 +139,25 @@ export default function Onboarding({ onComplete }) {
           {step === 1 && (
             <>
               <div>
-                <label className="label">Height (cm)</label>
-                <input className="input" type="number" value={form.height_cm} onChange={(e) => set('height_cm', e.target.value)} placeholder="175" />
+                <label className="label">Height</label>
+                <div className="flex gap-2 items-center">
+                  <input className="input w-20 text-center" type="number" min="3" max="8" value={form.height_ft}
+                    onChange={(e) => set('height_ft', e.target.value)} placeholder="5" />
+                  <span className="text-sm text-gray-500">ft</span>
+                  <input className="input w-20 text-center" type="number" min="0" max="11" value={form.height_in}
+                    onChange={(e) => set('height_in', e.target.value)} placeholder="10" />
+                  <span className="text-sm text-gray-500">in</span>
+                </div>
               </div>
               <div>
-                <label className="label">Current Weight (kg)</label>
-                <input className="input" type="number" step="0.1" value={form.current_weight_kg} onChange={(e) => set('current_weight_kg', e.target.value)} placeholder="80" />
+                <label className="label">Current Weight (lbs)</label>
+                <input className="input" type="number" step="0.5" value={form.current_weight_lbs}
+                  onChange={(e) => set('current_weight_lbs', e.target.value)} placeholder="175" />
               </div>
               <div>
-                <label className="label">Goal Weight (kg)</label>
-                <input className="input" type="number" step="0.1" value={form.goal_weight_kg} onChange={(e) => set('goal_weight_kg', e.target.value)} placeholder="70" />
+                <label className="label">Goal Weight (lbs)</label>
+                <input className="input" type="number" step="0.5" value={form.goal_weight_lbs}
+                  onChange={(e) => set('goal_weight_lbs', e.target.value)} placeholder="155" />
               </div>
             </>
           )}
