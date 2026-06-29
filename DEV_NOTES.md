@@ -227,53 +227,47 @@ The AI food logging understands natural language. Here's how to get more accurat
 
 ---
 
-## 4. Mistakes Made During Development
+## 4. Prompting Mistakes
 
-**DailyNotes overwriting the fasting timer**
-DailyNotes saved by spreading the entire `daily_meta` object into the upsert. Since FastingTimer's `fast_started_at` column wasn't in DailyNotes's own state, the spread would null it out silently on every notes save. Fixed by explicitly listing only the columns DailyNotes owns in the upsert payload.
+**Combining unrelated requests into one message**
+"yes lets do that I need limits plus do a full security audit line by line and the app as a whole" — two distinct tasks (rate limiting + full audit) in one message. When you stack requests like this, the model has to decide how to prioritise and may underdeliver on one. Cleaner: confirm the audit first, then in a follow-up say "now add rate limits too."
 
-**Running the setup guide SQL files out of order**
-Schema files must run in order (v1 → v2 → v3 → v4 → v5 → v6) because later files reference tables or columns created by earlier ones. Running them out of order causes foreign key or column-not-found errors.
+**Vague scope without a definition of done**
+"make sure instructions are up to date" — this has no clear finish line. What counts as up to date? Which instructions? The model had to infer the entire scope. A better version: "SETUP_GUIDE.md is missing the fasting timer and email summary features — update it to cover those."
 
-**AI endpoints had no authentication**
-The three AI Netlify functions (`log-food`, `get-suggestions`, `get-insights`) launched with zero auth — any request with the right URL could consume the Anthropic API key. A motivated person could run up a large bill. Fixed with JWT verification on every request.
+**Short follow-ups that rely on assumed context**
+"do they need to go to resend?" — who is "they"? In context it was obvious, but this kind of message works fine in a short session and breaks completely after a context compaction. Writing "do regular users (wife/friends) need a Resend account to receive emails?" costs two extra seconds and removes all ambiguity permanently.
 
-**Trusting client-supplied profile data**
-The original functions accepted `profile` in the POST body and used it directly in the Claude prompt. A user could send fabricated profile data (wrong targets, wrong dietary options). Now the server fetches the profile from the database using the verified user identity.
+**Asking for a description instead of an action**
+"what security features does this have?" — this got you a description of the current state, but the real intent was to identify gaps and fix them. Skipping the description step and going straight to "audit the security of this app and fix anything critical" would have saved a round-trip.
 
-**No server-side image validation**
-The 5MB image size limit was checked only in the browser. Anyone calling the API directly could send arbitrarily large images to Claude. Added a server-side size check (converting base64 length to approximate byte count) and MIME type allowlist.
+**No constraint on effort or depth**
+"do a full security audit line by line and the app as a whole" — "line by line" and "the whole app" pull in opposite directions (one is exhaustive micro-review, the other is broad architecture review). Picking one scope produces a more useful result than asking for both.
 
-**No rate limiting on AI calls**
-Without limits, a single user with a valid account could call the AI endpoints thousands of times a day. All three endpoints now have per-user daily limits enforced atomically in Postgres.
+**Confirming without specifying limits**
+"yes lets do that" after a security plan was described — this is fine for simple tasks, but for a large multi-file change it's worth adding a constraint: "yes, but keep the rate limits generous — this is for family use, not a public product." That context changes the numbers chosen (30/10/5 per day were picked as reasonable defaults, but you weren't consulted).
 
 ---
 
-## 5. What Was Done Well
+## 5. What Was Done Well (Prompting)
 
-**Row Level Security on every table**
-From day one, every table has RLS enabled with policies tied to `auth.uid()`. No user can read, write, or delete another user's data — not through the browser, not through direct API calls, not through any workaround. The database enforces this independently of the application code.
+**Providing real-world context, not just a technical spec**
+"my account I don't mind set up but if wife or friends join I just want them to be able to go to app and set up everything" — this one sentence explained the actual use case (personal family app, not a SaaS product). It changed how the auth flow, setup guide, and email feature were framed. Real context beats feature descriptions every time.
 
-**Macro calculations done client-side, saved to DB**
-`calculateDailyTargets()` uses the Mifflin-St Jeor equation — a well-validated clinical standard. Targets are recalculated and stored on every profile save, not recomputed on every page load, which keeps the UI fast.
+**Building iteratively instead of spec-ing everything upfront**
+Features were added one conversation at a time — fasting timer, then email summaries, then security. This meant each feature could be tested before the next one was added, and mistakes were caught at a small scale rather than buried in a large untested batch.
 
-**Dietary context is injected into every AI call, not just some**
-`buildDietaryContext()` is called in all three AI functions. Whether logging food, getting suggestions, or reading weekly insights — if a user has keto or bariatric flags set, every AI response respects those constraints.
+**Asking for a check before trusting the output**
+"OK add that to instructions to check that" — after being told what Supabase sign-up settings to verify, you immediately asked for it to be added to the setup guide. Catching the gap between "the model knows this" and "this is documented for users" is exactly right.
 
-**DailyNotes and FastingTimer save independently**
-Two components write to the same `daily_meta` row but using selective column upserts — they don't interfere with each other. This is the correct pattern for shared-row writes.
+**Pushing back to clarify responsibility**
+"do they need to go to resend?" — even if the phrasing was short, the underlying instinct was correct: you noticed that the email setup instructions might burden regular users and asked whether that was the case. Questioning who does what is exactly the right habit.
 
-**Progressive Web App from the start**
-The PWA manifest and Apple meta tags mean users can install the app to their home screen on both Android and iOS without any app store. On Android the fasting timer notification works even when the app is closed.
+**Asking for the security audit explicitly rather than assuming**
+Most people building a personal app would never think to ask for a security audit. Asking the question surfaced three critical issues (no auth, no rate limits, client-trusted profile data) that would have been invisible until someone exploited them. The decision to ask was the most valuable prompt in the entire session.
 
-**Streak and rollover are useful motivational mechanics**
-The streak algorithm correctly handles the edge case of "today not yet logged" (counts from yesterday backward). The rollover caps at 300 kcal to prevent the anti-pattern of banking large deficits and then binge-eating.
-
-**The scheduled email summary is owner-only infrastructure**
-Regular users just toggle "Daily email summary" in settings. You (the owner) set up Resend once. Nobody else ever touches an API key or environment variable. That's the right separation.
-
-**No profile data in AI request bodies**
-After the security fix, the AI functions receive only what's needed from the client (food description, today's running totals for context) and pull everything sensitive (targets, dietary options, goals) from the database server-side. This means a user can't manipulate their AI responses by sending fake profile data.
+**Letting the model make implementation decisions**
+You didn't specify how to implement JWT verification, how to structure the rate-limit table, or what the daily limits should be. This is usually the right call — you set the goal, the model picks the approach. Where this can go wrong is when you have a specific constraint (budget, UX, existing pattern) that the model can't know — in those cases, add the constraint rather than leaving it open.
 
 ---
 
