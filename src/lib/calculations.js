@@ -27,18 +27,26 @@ export function calculateDailyTargets(profile) {
   )
 
   const tdee = Math.round(bmr * ACTIVITY_MULTIPLIERS[profile.activity_level])
-  const dailyCalories = Math.max(1200, tdee + GOAL_ADJUSTMENTS[profile.goal])
+  // Gender-aware minimum: 1500 kcal for males, 1200 for females/other
+  // (NHS/Mayo Clinic guidance: don't go below these without medical supervision)
+  const minCalories = profile.gender === 'male' ? 1500 : 1200
+  const dailyCalories = Math.max(minCalories, tdee + GOAL_ADJUSTMENTS[profile.goal])
 
-  // Protein: 1.8g per kg of body weight
-  const proteinG = Math.round(1.8 * profile.current_weight_kg)
-  const proteinCal = proteinG * 4
+  // Protein: 1.8g/kg supports muscle retention during a deficit (ISSN position stand 1.6–2.2g/kg)
+  // Capped at 35% of calories so it can't crowd out fat and carbs at low calorie targets
+  let proteinG = Math.round(1.8 * profile.current_weight_kg)
+  let proteinCal = proteinG * 4
+  if (proteinCal > dailyCalories * 0.35) {
+    proteinCal = Math.round(dailyCalories * 0.35)
+    proteinG = Math.round(proteinCal / 4)
+  }
 
-  // Fat: 27% of calories
+  // Fat: 27% of calories (within the 20–35% AMDR; 27% is a solid midpoint)
   const fatCal = Math.round(dailyCalories * 0.27)
   const fatG = Math.round(fatCal / 9)
 
-  // Carbs: remainder
-  const carbsCal = dailyCalories - proteinCal - fatCal
+  // Carbs: remainder, floored at 0
+  const carbsCal = Math.max(0, dailyCalories - proteinCal - fatCal)
   const carbsG = Math.round(carbsCal / 4)
 
   return {

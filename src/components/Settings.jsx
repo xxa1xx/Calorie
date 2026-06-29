@@ -268,7 +268,7 @@ export default function Settings({ profile, onSaved }) {
             <div>
               <p className="text-sm font-medium text-gray-800">Daily email summary</p>
               <p className="text-xs text-gray-500 mt-0.5">
-                Receive a daily summary at 8pm. Requires <code className="bg-gray-100 px-1 rounded">RESEND_API_KEY</code> in Netlify — see Setup Guide.
+                Receive a daily summary email at 8pm with your totals for the day.
               </p>
             </div>
             <button
@@ -281,7 +281,7 @@ export default function Settings({ profile, onSaved }) {
           </div>
           {form.email_summary && (
             <p className="text-xs text-primary-700 bg-primary-50 rounded-lg p-2">
-              Summary will be sent to your account email. Make sure you've set <code>RESEND_API_KEY</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code> in your Netlify environment variables.
+              Summary will be sent to your account email each evening.
             </p>
           )}
         </div>
