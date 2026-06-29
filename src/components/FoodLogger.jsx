@@ -51,6 +51,7 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
   const [feedback, setFeedback] = useState('')
   const [error, setError] = useState('')
   const fileRef = useRef()
+  const galleryRef = useRef()
 
   const setMacro = (key, val) => setMacros((m) => ({ ...m, [key]: val }))
 
@@ -67,6 +68,7 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
     if (image?.preview) URL.revokeObjectURL(image.preview)
     setImage(null)
     if (fileRef.current) fileRef.current.value = ''
+    if (galleryRef.current) galleryRef.current.value = ''
   }
 
   const reset = () => {
@@ -267,14 +269,22 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={() => fileRef.current?.click()} disabled={loading}
-              className="btn-secondary flex items-center gap-2 px-3 py-2 text-sm" title="Upload photo">
+              className="btn-secondary flex items-center gap-2 px-3 py-2 text-sm" title="Take a photo">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              Photo
+              Camera
+            </button>
+            <button type="button" onClick={() => galleryRef.current?.click()} disabled={loading}
+              className="btn-secondary flex items-center gap-2 px-3 py-2 text-sm" title="Choose from gallery">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Gallery
             </button>
             <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImage} />
+            <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={handleImage} />
             <button type="submit" className="btn-primary flex-1" disabled={(!description.trim() && !image) || loading}>
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
