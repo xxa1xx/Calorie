@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
+import { calculateDailyTargets } from '../lib/calculations'
 import { exportToCSV } from '../lib/export'
 import { DIETARY_OPTIONS } from '../lib/dietary'
 import MacroProgress from './MacroProgress'
@@ -69,6 +70,7 @@ export default function Dashboard({ profile, onUpdateProfile }) {
   const [streak, setStreak] = useState(0)
   const [copying, setCopying] = useState(false)
   const [copyMsg, setCopyMsg] = useState('')
+  const [lastWeightDate, setLastWeightDate] = useState(null)
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -103,6 +105,17 @@ export default function Dashboard({ profile, onUpdateProfile }) {
   }, [user.id, today])
 
   useEffect(() => { loadData() }, [loadData])
+
+  useEffect(() => {
+    supabase
+      .from('weight_logs')
+      .select('date')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false })
+      .limit(1)
+      .single()
+      .then(({ data }) => setLastWeightDate(data?.date || null))
+  }, [user.id])
 
   const todayTotals = sumLogs(todayLogs)
 
@@ -148,6 +161,19 @@ export default function Dashboard({ profile, onUpdateProfile }) {
       .order('date', { ascending: false })
     if (data) exportToCSV(data)
     setExporting(false)
+  }
+
+  const handleWeightLogged = async (weightKg) => {
+    const updatedProfile = { ...currentProfile, current_weight_kg: weightKg }
+    const newTargets = calculateDailyTargets(updatedProfile)
+    const merged = { ...updatedProfile, ...newTargets }
+    await supabase
+      .from('profiles')
+      .update({ current_weight_kg: weightKg, ...newTargets, updated_at: new Date().toISOString() })
+      .eq('id', user.id)
+    setCurrentProfile(merged)
+    onUpdateProfile(merged)
+    setLastWeightDate(new Date().toISOString().split('T')[0])
   }
 
   const handleProfileSaved = (updated) => {
@@ -217,6 +243,27 @@ export default function Dashboard({ profile, onUpdateProfile }) {
           <>
             {activeTab === 'today' && (
               <>
+                {(() => {
+                  const daysSince = lastWeightDate
+                    ? Math.floor((Date.now() - new Date(lastWeightDate + 'T00:00:00').getTime()) / 86400000)
+                    : null
+                  if (daysSince !== null && daysSince < 7) return null
+                  return (
+                    <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+                      <span className="text-xl">⚖️</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-blue-900">
+                          {daysSince === null ? 'Log your first weigh-in' : `Time to weigh in — ${daysSince} days since last`}
+                        </p>
+                        <p className="text-xs text-blue-700">Regular weigh-ins keep your calorie targets accurate.</p>
+                      </div>
+                      <button onClick={() => setActiveTab('progress')}
+                        className="text-xs text-blue-700 font-semibold whitespace-nowrap shrink-0 underline">
+                        Go →
+                      </button>
+                    </div>
+                  )
+                })()}
                 <MacroProgress
                   profile={currentProfile}
                   todayTotals={todayTotals}
@@ -276,7 +323,7 @@ export default function Dashboard({ profile, onUpdateProfile }) {
             {activeTab === 'progress' && (
               <>
                 <CalorieChart weeklyLogs={weeklyLogs.slice(0, 7)} target={currentProfile.daily_calorie_target} />
-                <WeightTracker profile={currentProfile} />
+                <WeightTracker profile={currentProfile} onWeightLogged={handleWeightLogged} />
                 <div className="card">
                   <h2 className="text-lg font-semibold mb-2">Export Data</h2>
                   <p className="text-sm text-gray-500 mb-4">Download your complete food log as a CSV file — useful for doctors, dietitians, or your own records.</p>
