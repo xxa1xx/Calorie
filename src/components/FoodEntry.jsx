@@ -8,9 +8,14 @@ export default function FoodEntry({ entry, onDelete }) {
   const handleDelete = async () => {
     if (!confirm('Remove this entry?')) return
     setDeleting(true)
-    const { error } = await supabase.from('food_logs').delete().eq('id', entry.id)
-    if (error) {
-      console.error('Delete failed:', error)
+    const { data: deleted, error } = await supabase
+      .from('food_logs')
+      .delete()
+      .eq('id', entry.id)
+      .select('id')
+    if (error || !deleted?.length) {
+      console.error('Delete failed — RLS may be blocking:', error, deleted)
+      alert('Could not delete entry. Please run schema-v9.sql in Supabase to fix permissions.')
       setDeleting(false)
       return
     }

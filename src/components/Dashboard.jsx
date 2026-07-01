@@ -170,7 +170,16 @@ export default function Dashboard({ profile, onUpdateProfile }) {
     if (!confirmClear) { setConfirmClear(true); setTimeout(() => setConfirmClear(false), 4000); return }
     setClearingToday(true)
     setConfirmClear(false)
-    await supabase.from('food_logs').delete().eq('user_id', user.id).eq('date', today)
+    const { data: deleted, error } = await supabase
+      .from('food_logs')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('date', today)
+      .select('id')
+    if (error || !deleted) {
+      console.error('Clear today failed:', error)
+      alert('Could not clear entries. Please run schema-v9.sql in Supabase to fix permissions.')
+    }
     await loadData()
     setClearingToday(false)
   }
