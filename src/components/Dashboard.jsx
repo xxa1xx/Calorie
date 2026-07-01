@@ -71,6 +71,8 @@ export default function Dashboard({ profile, onUpdateProfile }) {
   const [copying, setCopying] = useState(false)
   const [copyMsg, setCopyMsg] = useState('')
   const [lastWeightDate, setLastWeightDate] = useState(null)
+  const [clearingToday, setClearingToday] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -161,6 +163,15 @@ export default function Dashboard({ profile, onUpdateProfile }) {
       .order('date', { ascending: false })
     if (data) exportToCSV(data)
     setExporting(false)
+  }
+
+  const handleClearToday = async () => {
+    if (!confirmClear) { setConfirmClear(true); setTimeout(() => setConfirmClear(false), 4000); return }
+    setClearingToday(true)
+    setConfirmClear(false)
+    await supabase.from('food_logs').delete().eq('user_id', user.id).eq('date', today)
+    await loadData()
+    setClearingToday(false)
   }
 
   const handleWeightLogged = async (weightKg) => {
@@ -277,7 +288,7 @@ export default function Dashboard({ profile, onUpdateProfile }) {
                 <QuickLog onLogged={handleFoodLogged} />
                 <FoodLogger profile={currentProfile} todayTotals={todayTotals} onLogged={handleFoodLogged} />
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <button
                     onClick={handleCopyYesterday}
                     disabled={copying}
@@ -288,6 +299,15 @@ export default function Dashboard({ profile, onUpdateProfile }) {
                     </svg>
                     {copying ? 'Copying...' : 'Copy Yesterday'}
                   </button>
+                  {todayLogs.length > 0 && (
+                    <button
+                      onClick={handleClearToday}
+                      disabled={clearingToday}
+                      className={`btn-secondary text-sm flex items-center gap-2 ${confirmClear ? 'border-red-400 text-red-600 bg-red-50' : ''}`}
+                    >
+                      {clearingToday ? 'Clearing...' : confirmClear ? 'Tap again to confirm' : 'Clear Today'}
+                    </button>
+                  )}
                   {copyMsg && <span className="text-sm text-gray-500">{copyMsg}</span>}
                 </div>
 

@@ -56,6 +56,8 @@ export default function Settings({ profile, onSaved }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [confirmReset, setConfirmReset] = useState(false)
+  const [resetting, setResetting] = useState(false)
   const [notifPermission, setNotifPermission] = useState(getPermission())
   const [reminderEnabled, setReminderEnabled] = useState(
     () => localStorage.getItem('calorieai-reminder') === 'true'
@@ -110,6 +112,17 @@ export default function Settings({ profile, onSaved }) {
     }
     const t = calculateDailyTargets(pd)
     set('calorie_target', String(t.daily_calorie_target))
+  }
+
+  const handleResetProfile = async () => {
+    if (!confirmReset) {
+      setConfirmReset(true)
+      setTimeout(() => setConfirmReset(false), 5000)
+      return
+    }
+    setResetting(true)
+    await supabase.from('profiles').delete().eq('id', user.id)
+    onSaved(null)
   }
 
   const handleSave = async () => {
@@ -377,6 +390,24 @@ export default function Settings({ profile, onSaved }) {
       >
         {saving ? 'Saving...' : saved ? '✓ Saved' : 'Save Changes'}
       </button>
+
+      <Section title="Account">
+        <p className="text-xs text-gray-500 -mt-1">
+          Clears your profile settings and reruns setup. Your food logs, weight history, and saved favorites are kept.
+        </p>
+        <button
+          type="button"
+          onClick={handleResetProfile}
+          disabled={resetting}
+          className={`w-full py-2.5 rounded-xl border text-sm font-medium transition-colors ${
+            confirmReset
+              ? 'border-red-400 bg-red-50 text-red-700'
+              : 'border-gray-300 text-gray-600 hover:border-red-300 hover:text-red-600'
+          }`}
+        >
+          {resetting ? 'Resetting...' : confirmReset ? 'Tap again to confirm reset' : 'Reset Profile & Re-do Setup'}
+        </button>
+      </Section>
     </div>
   )
 }
