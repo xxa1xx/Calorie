@@ -8,7 +8,12 @@ export default function FoodEntry({ entry, onDelete }) {
   const handleDelete = async () => {
     if (!confirm('Remove this entry?')) return
     setDeleting(true)
-    await supabase.from('food_logs').delete().eq('id', entry.id)
+    const { error } = await supabase.from('food_logs').delete().eq('id', entry.id)
+    if (error) {
+      console.error('Delete failed:', error)
+      setDeleting(false)
+      return
+    }
     onDelete(entry.id)
   }
 
