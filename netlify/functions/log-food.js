@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { buildDietaryContext } from './_dietary.js'
-import { requireAuth, fetchProfile, checkRateLimit, unauthorized, rateLimited } from './_auth.js'
+import { requireAuth, fetchProfile, checkRateLimit, unauthorized, rateLimited, SECURITY_HEADERS } from './_auth.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -9,7 +9,7 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
 
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' }
+    return { statusCode: 405, headers: SECURITY_HEADERS, body: JSON.stringify({ error: 'Method Not Allowed' }) }
   }
 
   const { user, supabase, error: authError } = await requireAuth(event)
@@ -19,24 +19,24 @@ export const handler = async (event) => {
   try {
     body = JSON.parse(event.body)
   } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }
+    return { statusCode: 400, headers: SECURITY_HEADERS, body: JSON.stringify({ error: 'Invalid JSON' }) }
   }
 
   const { description, todayLog, imageBase64, imageType } = body
 
   if (!description && !imageBase64) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
+    return { statusCode: 400, headers: SECURITY_HEADERS, body: JSON.stringify({ error: 'Missing required fields' }) }
   }
 
   // Validate image size server-side (client check alone is not sufficient)
   if (imageBase64) {
     const approxBytes = Math.ceil(imageBase64.length * 0.75)
     if (approxBytes > MAX_IMAGE_BYTES) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Image must be under 5MB' }) }
+      return { statusCode: 400, headers: SECURITY_HEADERS, body: JSON.stringify({ error: 'Image must be under 5MB' }) }
     }
     const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
     if (imageType && !validTypes.includes(imageType)) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Unsupported image type' }) }
+      return { statusCode: 400, headers: SECURITY_HEADERS, body: JSON.stringify({ error: 'Unsupported image type' }) }
     }
   }
 
@@ -46,7 +46,7 @@ export const handler = async (event) => {
 
   // Fetch profile server-side — never trust client-supplied profile data
   const { profile, error: profileError } = await fetchProfile(supabase, user.id)
-  if (profileError) return { statusCode: 404, body: JSON.stringify({ error: 'Profile not found' }) }
+  if (profileError) return { statusCode: 404, headers: SECURITY_HEADERS, body: JSON.stringify({ error: 'Profile not found' }) }
 
   const todayTotals = todayLog
     ? `Calories logged so far today: ${todayLog.calories} / ${profile.daily_calorie_target} kcal, Protein: ${todayLog.protein_g}g / ${profile.daily_protein_target}g, Carbs: ${todayLog.carbs_g}g / ${profile.daily_carbs_target}g, Fat: ${todayLog.fat_g}g / ${profile.daily_fat_target}g`
@@ -115,14 +115,14 @@ Return this exact JSON structure (no markdown, no code blocks):
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: SECURITY_HEADERS,
       body: JSON.stringify(nutritionData),
     }
   } catch (err) {
     console.error('log-food error:', err)
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: SECURITY_HEADERS,
       body: JSON.stringify({ error: 'Failed to analyse food. Please try again.' }),
     }
   }

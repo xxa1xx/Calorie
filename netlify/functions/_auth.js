@@ -67,10 +67,18 @@ export async function checkRateLimit(supabase, column, limit) {
   return data === true
 }
 
+export const SECURITY_HEADERS = {
+  'Content-Type': 'application/json',
+  'X-Content-Type-Options': 'nosniff',
+  'Cache-Control': 'no-store',
+  'Referrer-Policy': 'no-referrer',
+  'X-Frame-Options': 'DENY',
+}
+
 export function unauthorized(message = 'Unauthorized') {
   return {
     statusCode: 401,
-    headers: { 'Content-Type': 'application/json' },
+    headers: SECURITY_HEADERS,
     body: JSON.stringify({ error: message }),
   }
 }
@@ -78,7 +86,7 @@ export function unauthorized(message = 'Unauthorized') {
 export function rateLimited(message = 'Daily limit reached. Try again tomorrow.') {
   return {
     statusCode: 429,
-    headers: { 'Content-Type': 'application/json' },
+    headers: SECURITY_HEADERS,
     body: JSON.stringify({ error: message }),
   }
 }

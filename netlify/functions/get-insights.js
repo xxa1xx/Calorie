@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { buildDietaryContext } from './_dietary.js'
-import { requireAuth, fetchProfile, checkRateLimit, unauthorized, rateLimited } from './_auth.js'
+import { requireAuth, fetchProfile, checkRateLimit, unauthorized, rateLimited, SECURITY_HEADERS } from './_auth.js'
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -8,7 +8,7 @@ const DAILY_LIMIT = 5
 
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' }
+    return { statusCode: 405, headers: SECURITY_HEADERS, body: JSON.stringify({ error: 'Method Not Allowed' }) }
   }
 
   const { user, supabase, error: authError } = await requireAuth(event)
@@ -18,13 +18,13 @@ export const handler = async (event) => {
   try {
     body = JSON.parse(event.body)
   } catch {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }
+    return { statusCode: 400, headers: SECURITY_HEADERS, body: JSON.stringify({ error: 'Invalid JSON' }) }
   }
 
   const { weeklyLogs } = body
 
   if (!weeklyLogs) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
+    return { statusCode: 400, headers: SECURITY_HEADERS, body: JSON.stringify({ error: 'Missing required fields' }) }
   }
 
   const allowed = await checkRateLimit(supabase, 'insights_count', DAILY_LIMIT)
@@ -32,7 +32,7 @@ export const handler = async (event) => {
 
   // Fetch profile server-side
   const { profile, error: profileError } = await fetchProfile(supabase, user.id)
-  if (profileError) return { statusCode: 404, body: JSON.stringify({ error: 'Profile not found' }) }
+  if (profileError) return { statusCode: 404, headers: SECURITY_HEADERS, body: JSON.stringify({ error: 'Profile not found' }) }
 
   const logSummary = weeklyLogs.map((day) => ({
     date: day.date,
@@ -103,14 +103,14 @@ Analyse patterns and provide actionable insights. Return exactly this JSON (no m
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: SECURITY_HEADERS,
       body: JSON.stringify(data),
     }
   } catch (err) {
     console.error('get-insights error:', err)
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: SECURITY_HEADERS,
       body: JSON.stringify({ error: 'Failed to get insights. Please try again.' }),
     }
   }
