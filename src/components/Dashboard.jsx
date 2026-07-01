@@ -73,6 +73,7 @@ export default function Dashboard({ profile, onUpdateProfile }) {
   const [lastWeightDate, setLastWeightDate] = useState(null)
   const [clearingToday, setClearingToday] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
+  const [rolloverDismissed, setRolloverDismissed] = useState(false)
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -122,7 +123,7 @@ export default function Dashboard({ profile, onUpdateProfile }) {
   const todayTotals = sumLogs(todayLogs)
 
   const [currentProfile, setCurrentProfile] = useState(profile)
-  const rolloverCalories = calcRollover(allLogs, currentProfile.daily_calorie_target)
+  const rolloverCalories = rolloverDismissed ? 0 : calcRollover(allLogs, currentProfile.daily_calorie_target)
 
   const handleFoodLogged = () => loadData()
 
@@ -281,6 +282,7 @@ export default function Dashboard({ profile, onUpdateProfile }) {
                   isWorkoutDay={isWorkoutDay}
                   streak={streak}
                   rolloverCalories={rolloverCalories}
+                  onDismissRollover={rolloverCalories > 0 ? () => setRolloverDismissed(true) : undefined}
                 />
                 <DailyNotes onWorkoutDayChange={setIsWorkoutDay} />
                 <FastingTimer />
@@ -299,15 +301,13 @@ export default function Dashboard({ profile, onUpdateProfile }) {
                     </svg>
                     {copying ? 'Copying...' : 'Copy Yesterday'}
                   </button>
-                  {todayLogs.length > 0 && (
-                    <button
-                      onClick={handleClearToday}
-                      disabled={clearingToday}
-                      className={`btn-secondary text-sm flex items-center gap-2 ${confirmClear ? 'border-red-400 text-red-600 bg-red-50' : ''}`}
-                    >
-                      {clearingToday ? 'Clearing...' : confirmClear ? 'Tap again to confirm' : 'Clear Today'}
-                    </button>
-                  )}
+                  <button
+                    onClick={handleClearToday}
+                    disabled={clearingToday || todayLogs.length === 0}
+                    className={`btn-secondary text-sm flex items-center gap-2 ${confirmClear ? 'border-red-400 text-red-600 bg-red-50' : ''}`}
+                  >
+                    {clearingToday ? 'Clearing...' : confirmClear ? 'Tap again to confirm' : 'Clear Today'}
+                  </button>
                   {copyMsg && <span className="text-sm text-gray-500">{copyMsg}</span>}
                 </div>
 
