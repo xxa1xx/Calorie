@@ -283,6 +283,8 @@ export default function Dashboard({ profile, onUpdateProfile }) {
                   streak={streak}
                   rolloverCalories={rolloverCalories}
                   onDismissRollover={rolloverCalories > 0 ? () => setRolloverDismissed(true) : undefined}
+                  rolloverAvailable={rolloverDismissed ? calcRollover(allLogs, currentProfile.daily_calorie_target) : 0}
+                  onRestoreRollover={rolloverDismissed ? () => setRolloverDismissed(false) : undefined}
                 />
                 <DailyNotes onWorkoutDayChange={setIsWorkoutDay} />
                 <FastingTimer />

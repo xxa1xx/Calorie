@@ -15,7 +15,7 @@ function MacroBar({ label, current, target, color, unit = 'g' }) {
   )
 }
 
-export default function MacroProgress({ profile, todayTotals, isWorkoutDay, streak, rolloverCalories, onDismissRollover }) {
+export default function MacroProgress({ profile, todayTotals, isWorkoutDay, streak, rolloverCalories, onDismissRollover, rolloverAvailable, onRestoreRollover }) {
   const { calories = 0, protein_g = 0, carbs_g = 0, fat_g = 0, fiber_g = 0 } = todayTotals || {}
   const workoutBonus = isWorkoutDay ? (profile.workout_calorie_bonus || 200) : 0
   const effectiveTarget = profile.daily_calorie_target + workoutBonus + (rolloverCalories || 0)
@@ -56,6 +56,12 @@ export default function MacroProgress({ profile, todayTotals, isWorkoutDay, stre
                 <button type="button" onClick={onDismissRollover} className="opacity-60 hover:opacity-100 leading-none" aria-label="Dismiss rollover">×</button>
               )}
             </span>
+          )}
+          {rolloverAvailable > 0 && onRestoreRollover && (
+            <button type="button" onClick={onRestoreRollover}
+              className="text-xs bg-gray-100 text-gray-500 hover:bg-blue-100 hover:text-blue-700 px-1.5 py-0.5 rounded-full transition-colors">
+              +{rolloverAvailable} rollover
+            </button>
           )}
         </div>
         <div className="text-sm text-gray-600 mt-1">{remaining} kcal remaining</div>
