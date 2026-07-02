@@ -2,7 +2,9 @@
 // Schedule: 8pm UTC daily (configure in netlify.toml)
 // Requires env vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, PUBLIC_APP_URL
 
-export default async (req) => {
+import { escapeHtml, safeHttpsOrigin } from './_email.js'
+
+export default async () => {
   const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, PUBLIC_APP_URL } = process.env
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !RESEND_API_KEY) {
@@ -45,13 +47,13 @@ export default async (req) => {
 
     const pct = Math.round((totals.calories / Math.max(1, profile.daily_calorie_target)) * 100)
     const remaining = Math.max(0, profile.daily_calorie_target - totals.calories)
-    const appUrl = PUBLIC_APP_URL || 'https://your-app.netlify.app'
+    const appUrl = safeHttpsOrigin(PUBLIC_APP_URL)
     const dateFormatted = new Date(today + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
 
     const entries = (logs || []).map((l) => `
       <tr>
-        <td style="padding:6px 0;color:#374151;font-size:14px">${l.description}</td>
-        <td style="padding:6px 0;color:#6b7280;font-size:14px;text-align:right">${l.calories} kcal</td>
+        <td style="padding:6px 0;color:#374151;font-size:14px">${escapeHtml(l.description)}</td>
+        <td style="padding:6px 0;color:#6b7280;font-size:14px;text-align:right">${Math.round(Number(l.calories) || 0)} kcal</td>
       </tr>`).join('')
 
     const statusColor = pct >= 100 ? '#ef4444' : pct >= 70 ? '#22c55e' : '#6366f1'
@@ -72,16 +74,16 @@ export default async (req) => {
     <div style="background:#6366f1;padding:24px;text-align:center">
       <div style="font-size:36px">🥗</div>
       <h1 style="color:#fff;margin:8px 0 0;font-size:20px">CalorieAI Daily Summary</h1>
-      <p style="color:#c7d2fe;margin:4px 0 0;font-size:14px">${dateFormatted}</p>
+      <p style="color:#c7d2fe;margin:4px 0 0;font-size:14px">${escapeHtml(dateFormatted)}</p>
     </div>
 
     <div style="padding:24px">
-      <p style="margin:0 0 16px;color:#374151">Hi ${profile.name},</p>
+      <p style="margin:0 0 16px;color:#374151">Hi ${escapeHtml(profile.name)},</p>
 
       <div style="background:#f3f4f6;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px">
         <div style="font-size:42px;font-weight:700;color:${statusColor}">${Math.round(totals.calories)}</div>
         <div style="color:#6b7280;font-size:14px">of ${profile.daily_calorie_target} kcal — ${pct}%</div>
-        <div style="color:#374151;font-size:14px;margin-top:8px">${message}</div>
+        <div style="color:#374151;font-size:14px;margin-top:8px">${escapeHtml(message)}</div>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;text-align:center">
@@ -105,7 +107,7 @@ export default async (req) => {
         ${entries}
       </table>` : ''}
 
-      <a href="${appUrl}" style="display:block;background:#6366f1;color:#fff;text-decoration:none;text-align:center;padding:14px;border-radius:10px;font-weight:600;font-size:15px">
+      <a href="${escapeHtml(appUrl)}" style="display:block;background:#6366f1;color:#fff;text-decoration:none;text-align:center;padding:14px;border-radius:10px;font-weight:600;font-size:15px">
         Open CalorieAI →
       </a>
 

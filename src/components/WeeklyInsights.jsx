@@ -1,10 +1,82 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../hooks/useAuth'
+
+function formatSavedDate(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
 
 export default function WeeklyInsights({ profile, weeklyLogs }) {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [loadingSaved, setLoadingSaved] = useState(true)
   const [insights, setInsights] = useState(null)
   const [error, setError] = useState('')
+  const [saveWarning, setSaveWarning] = useState('')
+  const [savedAt, setSavedAt] = useState(null)
+  const [period, setPeriod] = useState(null)
+
+  const storageKey = user?.id ? `calorieai:last-insight:${user.id}` : null
+
+  useEffect(() => {
+    if (!user?.id || !storageKey) return
+    let cancelled = false
+
+    const loadSavedInsight = async () => {
+      let hadCachedInsight = false
+      try {
+        const cached = localStorage.getItem(storageKey)
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (!cancelled && parsed?.insight) {
+            hadCachedInsight = true
+            setInsights(parsed.insight)
+            setSavedAt(parsed.generatedAt || null)
+            setPeriod(parsed.periodStart && parsed.periodEnd
+              ? { start: parsed.periodStart, end: parsed.periodEnd }
+              : null)
+          }
+        }
+      } catch (_) {
+        try { localStorage.removeItem(storageKey) } catch (_) {}
+      }
+
+      const { data, error: loadError } = await supabase
+        .from('weekly_insights')
+        .select('analysis, generated_at, period_start, period_end')
+        .eq('user_id', user.id)
+        .order('generated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (cancelled) return
+
+      if (data?.analysis) {
+        setInsights(data.analysis)
+        setSavedAt(data.generated_at)
+        setPeriod({ start: data.period_start, end: data.period_end })
+        setSaveWarning('')
+        try {
+          localStorage.setItem(storageKey, JSON.stringify({
+            insight: data.analysis,
+            generatedAt: data.generated_at,
+            periodStart: data.period_start,
+            periodEnd: data.period_end,
+          }))
+        } catch (_) {}
+      } else if (loadError && hadCachedInsight) {
+        setSaveWarning('The latest insight is saved on this device, but long-term insight history is not available yet.')
+      }
+
+      setLoadingSaved(false)
+    }
+
+    loadSavedInsight()
+    return () => { cancelled = true }
+  }, [storageKey, user?.id])
 
   const fetchInsights = async () => {
     if (!weeklyLogs || weeklyLogs.length === 0) {
@@ -14,6 +86,7 @@ export default function WeeklyInsights({ profile, weeklyLogs }) {
 
     setLoading(true)
     setError('')
+    setSaveWarning('')
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -35,28 +108,63 @@ export default function WeeklyInsights({ profile, weeklyLogs }) {
       }
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      setInsights(data)
+
+      const { _meta, ...analysis } = data
+      const generatedAt = _meta?.generatedAt || new Date().toISOString()
+      const nextPeriod = _meta?.periodStart && _meta?.periodEnd
+        ? { start: _meta.periodStart, end: _meta.periodEnd }
+        : null
+
+      setInsights(analysis)
+      setSavedAt(generatedAt)
+      setPeriod(nextPeriod)
+
+      try {
+        localStorage.setItem(storageKey, JSON.stringify({
+          insight: analysis,
+          generatedAt,
+          periodStart: nextPeriod?.start,
+          periodEnd: nextPeriod?.end,
+        }))
+      } catch (_) {}
+
+      if (_meta?.saved === false) {
+        setSaveWarning('This insight is saved on this device, but it could not be added to long-term history.')
+      }
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
+      setLoadingSaved(false)
     }
   }
 
   return (
     <div className="card">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">Weekly Insights</h2>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <h2 className="text-lg font-semibold">Weekly Insights</h2>
+          {savedAt && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              Last saved {formatSavedDate(savedAt)}
+              {period ? ` · ${period.start} to ${period.end}` : ''}
+            </p>
+          )}
+        </div>
         <button
           onClick={fetchInsights}
-          disabled={loading}
-          className="text-sm btn-secondary py-1.5 px-3"
+          disabled={loading || loadingSaved}
+          className="text-sm btn-secondary py-1.5 px-3 shrink-0"
         >
           {loading ? 'Analyzing...' : insights ? 'Refresh' : 'Analyze Week'}
         </button>
       </div>
 
-      {!insights && !loading && (
+      {loadingSaved && !insights && (
+        <div className="text-center py-6 text-gray-400 text-sm">Loading your last saved insight...</div>
+      )}
+
+      {!insights && !loading && !loadingSaved && (
         <div className="text-center py-6 text-gray-500">
           <div className="text-3xl mb-2">📊</div>
           <p className="text-sm">Get AI analysis of your weekly eating patterns, trends, and personalized recommendations.</p>
@@ -68,12 +176,23 @@ export default function WeeklyInsights({ profile, weeklyLogs }) {
         <div className="bg-red-50 text-red-700 text-sm rounded-lg p-3">{error}</div>
       )}
 
+      {saveWarning && (
+        <div className="bg-amber-50 text-amber-800 text-xs rounded-lg p-3 mb-4">{saveWarning}</div>
+      )}
+
       {insights && (
         <div className="space-y-5">
           <div className={`flex items-center gap-2 p-3 rounded-lg ${insights.onTrack ? 'bg-green-50 text-green-800' : 'bg-yellow-50 text-yellow-800'}`}>
             <span className="text-xl">{insights.onTrack ? '✅' : '⚠️'}</span>
             <p className="text-sm font-medium">{insights.weekSummary}</p>
           </div>
+
+          {insights.trendComparison && (
+            <div className="bg-blue-50 rounded-lg p-3">
+              <h3 className="text-sm font-semibold text-blue-800 mb-1">Compared with Past Insights</h3>
+              <p className="text-sm text-blue-700">{insights.trendComparison}</p>
+            </div>
+          )}
 
           {insights.average && (
             <div>

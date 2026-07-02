@@ -3,13 +3,19 @@ import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
+function clearUserCaches(userId) {
+  if (!userId) return
+  try {
+    localStorage.removeItem(`calorieai:pending-food:${userId}`)
+    localStorage.removeItem(`calorieai:last-insight:${userId}`)
+  } catch (_) {}
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // onAuthStateChange fires INITIAL_SESSION immediately with the persisted session,
-    // so this is the single source of truth — no need for a separate getSession() call.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       setLoading(false)
@@ -24,7 +30,12 @@ export function AuthProvider({ children }) {
   const signIn = (email, password) =>
     supabase.auth.signInWithPassword({ email, password })
 
-  const signOut = () => supabase.auth.signOut()
+  const signOut = async () => {
+    const userId = user?.id
+    const result = await supabase.auth.signOut()
+    if (!result.error) clearUserCaches(userId)
+    return result
+  }
 
   const resetPassword = (email) =>
     supabase.auth.resetPasswordForEmail(email, {
