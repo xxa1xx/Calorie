@@ -40,6 +40,7 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
   const [error, setError] = useState('')
   const [pendingEntry, setPendingEntry] = useState(() => savedPending(user?.id))
   const fileRef = useRef()
+  const cameraRef = useRef()
   const pendingKey = user?.id ? `calorieai:pending-food:${user.id}` : null
 
   useEffect(() => {
@@ -50,10 +51,17 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
     } catch (_) {}
   }, [pendingEntry, pendingKey])
 
+  useEffect(() => {
+    if (!user?.id || pendingEntry) return
+    const restored = savedPending(user.id)
+    if (restored) setPendingEntry(restored)
+  }, [user?.id, pendingEntry])
+
   const clearImage = () => {
     if (image?.preview) URL.revokeObjectURL(image.preview)
     setImage(null)
     if (fileRef.current) fileRef.current.value = ''
+    if (cameraRef.current) cameraRef.current.value = ''
   }
 
   const reset = () => {
@@ -165,7 +173,7 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
     finally { setLoading(false) }
   }
 
-  const switchMode = (next) => { setMode(next); setError(''); if (next !== 'ai') setPendingEntry(null) }
+  const switchMode = (next) => { setMode(next); setError('') }
 
   return <div className="card">
     <h2 className="text-lg font-semibold mb-4">Log Food</h2>
@@ -191,7 +199,13 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
     {mode === 'ai' && !pendingEntry && <form onSubmit={handleAI} className="space-y-3">
       {image && <div className="relative rounded-lg overflow-hidden bg-gray-100"><img src={image.preview} alt="Food" className="w-full max-h-48 object-cover" /><button type="button" onClick={clearImage} className="absolute top-2 right-2 bg-black/50 text-white rounded-full w-7 h-7">×</button></div>}
       <textarea className="input resize-none" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={image ? 'Add a description (optional)...' : "Describe what you ate — e.g. 'two scrambled eggs on toast with butter'"} disabled={loading} />
-      <div className="flex gap-2"><button type="button" onClick={() => fileRef.current?.click()} className="btn-secondary">📷 Photo</button><input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImage} /><button type="submit" className="btn-primary flex-1" disabled={(!description.trim() && !image) || loading}>{loading ? 'Analysing...' : '✨ Analyse'}</button></div>
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => cameraRef.current?.click()} className="btn-secondary" disabled={loading}>📷 Take Photo</button>
+        <button type="button" onClick={() => fileRef.current?.click()} className="btn-secondary" disabled={loading}>🖼️ Upload</button>
+        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleImage} />
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImage} />
+      </div>
+      <button type="submit" className="btn-primary w-full" disabled={(!description.trim() && !image) || loading}>{loading ? 'Analysing...' : '✨ Analyse'}</button>
       <p className="text-xs text-center text-gray-400">Uses AI — ~$0.015 per analysis</p>
       {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{error}</p>}
     </form>}
