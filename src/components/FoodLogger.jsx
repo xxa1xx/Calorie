@@ -5,6 +5,7 @@ import FoodSearch from './FoodSearch'
 
 const BarcodeScanner = lazy(() => import('./BarcodeScanner'))
 const EMPTY_MACROS = { calories: '', protein_g: '', carbs_g: '', fat_g: '', fiber_g: '' }
+const PENDING_TTL_MS = 24 * 60 * 60 * 1000
 const TABS = [
   { id: 'manual', label: 'Manual' },
   { id: 'search', label: '🔍 Search' },
@@ -25,9 +26,24 @@ function MacroField({ label, value, onChange, required }) {
   return <div><label className="label text-xs">{label}</label><input type="number" min="0" step="0.1" className="input text-sm" value={value} onChange={(e) => onChange(e.target.value)} required={required} placeholder="0" /></div>
 }
 
+function pendingStorageKey(userId) {
+  return userId ? `calorieai:pending-food:${userId}` : null
+}
+
 function savedPending(userId) {
-  if (!userId) return null
-  try { return JSON.parse(localStorage.getItem(`calorieai:pending-food:${userId}`)) || null } catch { return null }
+  const key = pendingStorageKey(userId)
+  if (!key) return null
+  try {
+    const saved = JSON.parse(localStorage.getItem(key))
+    if (!saved?.entry || !Number.isFinite(saved.savedAt) || Date.now() - saved.savedAt > PENDING_TTL_MS) {
+      localStorage.removeItem(key)
+      return null
+    }
+    return saved.entry
+  } catch {
+    localStorage.removeItem(key)
+    return null
+  }
 }
 
 export default function FoodLogger({ profile, todayTotals, onLogged }) {
@@ -41,12 +57,12 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
   const [pendingEntry, setPendingEntry] = useState(() => savedPending(user?.id))
   const fileRef = useRef()
   const cameraRef = useRef()
-  const pendingKey = user?.id ? `calorieai:pending-food:${user.id}` : null
+  const pendingKey = pendingStorageKey(user?.id)
 
   useEffect(() => {
     if (!pendingKey) return
     try {
-      if (pendingEntry) localStorage.setItem(pendingKey, JSON.stringify(pendingEntry))
+      if (pendingEntry) localStorage.setItem(pendingKey, JSON.stringify({ savedAt: Date.now(), entry: pendingEntry }))
       else localStorage.removeItem(pendingKey)
     } catch (_) {}
   }, [pendingEntry, pendingKey])
@@ -180,7 +196,7 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
     <div className="flex rounded-lg bg-gray-100 p-0.5 mb-4 overflow-x-auto">{TABS.map((tab) => <button key={tab.id} type="button" onClick={() => switchMode(tab.id)} className={`flex-1 min-w-max px-2.5 py-1.5 text-xs font-medium rounded-md ${mode === tab.id ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}>{tab.label}</button>)}</div>
 
     {mode === 'manual' && <form onSubmit={handleManual} className="space-y-3">
-      <div><label className="label text-xs">Description</label><input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. chicken breast, brown rice, broccoli" required /></div>
+      <div><label className="label text-xs">Description</label><input className="input" maxLength={1000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. chicken breast, brown rice, broccoli" required /></div>
       <div className="grid grid-cols-2 gap-2">
         <MacroField label="Calories (kcal) *" value={macros.calories} onChange={(v) => setMacros((m) => ({ ...m, calories: v }))} required />
         <MacroField label="Protein (g)" value={macros.protein_g} onChange={(v) => setMacros((m) => ({ ...m, protein_g: v }))} />
@@ -198,7 +214,7 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
 
     {mode === 'ai' && !pendingEntry && <form onSubmit={handleAI} className="space-y-3">
       {image && <div className="relative rounded-lg overflow-hidden bg-gray-100"><img src={image.preview} alt="Food" className="w-full max-h-48 object-cover" /><button type="button" onClick={clearImage} className="absolute top-2 right-2 bg-black/50 text-white rounded-full w-7 h-7">×</button></div>}
-      <textarea className="input resize-none" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={image ? 'Add a description (optional)...' : "Describe what you ate — e.g. 'two scrambled eggs on toast with butter'"} disabled={loading} />
+      <textarea className="input resize-none" rows={3} maxLength={1000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={image ? 'Add a description (optional)...' : "Describe what you ate — e.g. 'two scrambled eggs on toast with butter'"} disabled={loading} />
       <div className="grid grid-cols-2 gap-2">
         <button type="button" onClick={() => cameraRef.current?.click()} className="btn-secondary" disabled={loading}>📷 Take Photo</button>
         <button type="button" onClick={() => fileRef.current?.click()} className="btn-secondary" disabled={loading}>🖼️ Upload</button>
@@ -211,9 +227,9 @@ export default function FoodLogger({ profile, todayTotals, onLogged }) {
     </form>}
 
     {mode === 'ai' && pendingEntry && <div className="space-y-4">
-      <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm text-green-800 font-medium">AI analysis saved while you review it. {pendingEntry.items?.length > 1 ? `${pendingEntry.items.length} foods will be logged separately.` : ''}</div>
+      <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-sm text-green-800 font-medium">AI analysis saved for up to 24 hours while you review it. {pendingEntry.items?.length > 1 ? `${pendingEntry.items.length} foods will be logged separately.` : ''}</div>
       {pendingEntry.items?.length > 0 && <div className="bg-gray-50 rounded-lg p-3 space-y-1"><p className="text-xs font-medium text-gray-500 mb-2">Items detected</p>{pendingEntry.items.map((item, i) => <div key={i} className="flex justify-between text-sm"><span>{item.name} <span className="text-gray-400">{item.amount}</span></span><span className="text-gray-500">{item.calories} kcal</span></div>)}</div>}
-      <div><label className="label text-xs">Description</label><input className="input" value={pendingEntry.description} onChange={(e) => setPendingEntry((p) => ({ ...p, description: e.target.value }))} /></div>
+      <div><label className="label text-xs">Description</label><input className="input" maxLength={1000} value={pendingEntry.description} onChange={(e) => setPendingEntry((p) => ({ ...p, description: e.target.value }))} /></div>
       <div className="grid grid-cols-2 gap-2">{[
         ['calories','Calories (kcal)'],['protein_g','Protein (g)'],['carbs_g','Carbs (g)'],['fat_g','Fat (g)'],['fiber_g','Fiber (g)']
       ].map(([key,label]) => <div key={key}><label className="label text-xs">{label}</label><input type="number" min="0" step="0.1" className="input text-sm" value={pendingEntry[key]} onChange={(e) => setPendingEntry((p) => ({ ...p, [key]: e.target.value }))} /></div>)}</div>
