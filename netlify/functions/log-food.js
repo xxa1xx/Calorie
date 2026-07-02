@@ -65,24 +65,31 @@ User profile:
 - Daily targets: ${profile.daily_calorie_target} kcal, ${profile.daily_protein_target}g protein, ${profile.daily_carbs_target}g carbs, ${profile.daily_fat_target}g fat
 - ${todayTotals}
 
+Important itemization rules:
+- Put every distinct food, drink, packaged item, side, or separately described portion in its own object in the items array.
+- Never combine two different foods into one items entry, even when the user entered them in one sentence.
+- Each item's nutrition fields must describe that item only.
+- The sum of all item nutrition values should approximately equal the top-level totals.
+
 Return this exact JSON structure (no markdown, no code blocks):
 {
   "calories": <total calories as integer>,
-  "protein_g": <protein in grams as number>,
-  "carbs_g": <carbohydrates in grams as number>,
-  "fat_g": <fat in grams as number>,
-  "fiber_g": <fiber in grams as number>,
+  "protein_g": <total protein in grams as number>,
+  "carbs_g": <total carbohydrates in grams as number>,
+  "fat_g": <total fat in grams as number>,
+  "fiber_g": <total fiber in grams as number>,
   "items": [
     {
-      "name": "<food item name>",
+      "name": "<one distinct food item name>",
       "amount": "<portion description>",
-      "calories": <calories as integer>,
-      "protein_g": <protein>,
-      "carbs_g": <carbs>,
-      "fat_g": <fat>
+      "calories": <calories for this item as integer>,
+      "protein_g": <protein for this item>,
+      "carbs_g": <carbs for this item>,
+      "fat_g": <fat for this item>,
+      "fiber_g": <fiber for this item>
     }
   ],
-  "feedback": "<1-2 sentences of personalised feedback about this meal in context of their daily progress, goal, and dietary preferences>"
+  "feedback": "<1-2 sentences of personalised feedback about the whole meal in context of their daily progress, goal, and dietary preferences>"
 }`
 
   const messageContent = imageBase64
@@ -95,7 +102,7 @@ Return this exact JSON structure (no markdown, no code blocks):
   try {
     const message = await anthropic.messages.create({
       model: 'claude-opus-4-8',
-      max_tokens: 1024,
+      max_tokens: 1400,
       thinking: { type: 'adaptive' },
       messages: [{ role: 'user', content: messageContent }],
       system: systemPrompt,
