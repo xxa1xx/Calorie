@@ -1,4 +1,4 @@
--- Catch-up migration: covers schema-v7 through schema-v11
+-- Catch-up migration: covers schema-v7 through schema-v12
 -- Safe to run even if some or all of these have already been applied.
 -- Run this once in the Supabase SQL Editor to bring your database fully up to date.
 
@@ -72,3 +72,6 @@ create policy "Users can delete own weekly insights"
 
 -- v11: craving coach usage tracking
 alter table ai_usage add column if not exists craving_count integer not null default 0;
+
+-- v12: allow multiple insight generations per period (full history)
+alter table weekly_insights drop constraint if exists weekly_insights_user_id_period_start_period_end_key;

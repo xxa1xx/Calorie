@@ -163,14 +163,14 @@ Analyse the current period, identify recurring patterns, and compare it with pre
     const generatedAt = new Date().toISOString()
     const { error: saveError } = await supabase
       .from('weekly_insights')
-      .upsert({
+      .insert({
         user_id: user.id,
         period_start: periodStart,
         period_end: periodEnd,
         analysis: data,
         source_summary: logSummary,
         generated_at: generatedAt,
-      }, { onConflict: 'user_id,period_start,period_end' })
+      })
 
     if (saveError) console.warn('Could not save weekly insight:', saveError.message)
 
