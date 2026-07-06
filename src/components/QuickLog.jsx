@@ -7,6 +7,7 @@ export default function QuickLog({ onLogged }) {
   const [favorites, setFavorites] = useState([])
   const [logging, setLogging] = useState(null)
   const [removing, setRemoving] = useState(null)
+  const [editing, setEditing] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -83,7 +84,17 @@ export default function QuickLog({ onLogged }) {
 
   return (
     <div className="card">
-      <h2 className="text-base font-semibold text-gray-700 mb-3">Quick Log</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-base font-semibold text-gray-700">Quick Log</h2>
+        <button
+          type="button"
+          onClick={() => setEditing((current) => !current)}
+          className="text-xs font-medium text-gray-500 hover:text-primary-600 px-2 py-1 rounded-md hover:bg-gray-100"
+        >
+          {editing ? 'Done' : 'Edit'}
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {favorites.map((fav) => (
           <div
@@ -111,25 +122,27 @@ export default function QuickLog({ onLogged }) {
               <span className="text-xs text-gray-500 shrink-0">{fav.calories} cal</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => handleRemove(fav)}
-              disabled={logging === fav.id || removing === fav.id}
-              className="w-11 shrink-0 rounded-xl border border-gray-200 bg-white text-gray-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors disabled:opacity-50"
-              aria-label={`Remove ${fav.description} from Quick Log`}
-              title="Remove from Quick Log"
-            >
-              {removing === fav.id ? (
-                <svg className="animate-spin h-4 w-4 mx-auto" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              ) : (
-                <svg className="h-4 w-4 mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-7 0h8" />
-                </svg>
-              )}
-            </button>
+            {editing && (
+              <button
+                type="button"
+                onClick={() => handleRemove(fav)}
+                disabled={logging === fav.id || removing === fav.id}
+                className="w-11 shrink-0 rounded-xl border border-gray-200 bg-white text-gray-400 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-colors disabled:opacity-50"
+                aria-label={`Remove ${fav.description} from Quick Log`}
+                title="Remove from Quick Log"
+              >
+                {removing === fav.id ? (
+                  <svg className="animate-spin h-4 w-4 mx-auto" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                ) : (
+                  <svg className="h-4 w-4 mx-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3m-7 0h8" />
+                  </svg>
+                )}
+              </button>
+            )}
           </div>
         ))}
       </div>
