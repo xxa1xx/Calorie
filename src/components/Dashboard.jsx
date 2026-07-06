@@ -18,6 +18,7 @@ import DailyNotes from './DailyNotes'
 import RecipeLibrary from './RecipeLibrary'
 import FastingTimer from './FastingTimer'
 import FoodLogHistory from './FoodLogHistory'
+import CravingCoach from './CravingCoach'
 
 function sumLogs(logs) {
   return logs.reduce(
@@ -300,6 +301,7 @@ export default function Dashboard({ profile, onUpdateProfile }) {
                 <WaterTracker />
                 <QuickLog onLogged={handleFoodLogged} />
                 <FoodLogger profile={currentProfile} todayTotals={todayTotals} onLogged={handleFoodLogged} />
+                <CravingCoach />
 
                 <div className="flex items-center gap-3 flex-wrap">
                   <button

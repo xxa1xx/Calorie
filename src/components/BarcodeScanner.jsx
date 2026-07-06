@@ -90,12 +90,14 @@ export default function BarcodeScanner({ onLogged }) {
     const { error: dbError } = await supabase.from('food_logs').insert(entry)
     if (dbError) { setError(dbError.message); setSaving(false); return }
 
-    await supabase.from('favorites').upsert(
-      { user_id: user.id, description: entry.description, calories: entry.calories,
-        protein_g: entry.protein_g, carbs_g: entry.carbs_g, fat_g: entry.fat_g,
-        fiber_g: entry.fiber_g, items: [], last_used: new Date().toISOString() },
-      { onConflict: 'user_id,description' }
-    ).catch(() => {})
+    try {
+      await supabase.from('favorites').upsert(
+        { user_id: user.id, description: entry.description, calories: entry.calories,
+          protein_g: entry.protein_g, carbs_g: entry.carbs_g, fat_g: entry.fat_g,
+          fiber_g: entry.fiber_g, items: [], last_used: new Date().toISOString() },
+        { onConflict: 'user_id,description' }
+      )
+    } catch (_) {}
 
     setProduct(null)
     setManualBarcode('')

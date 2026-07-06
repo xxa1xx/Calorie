@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { searchFoods, extractNutrients } from '../lib/openFoodFacts'
+import { searchUSDA } from '../lib/usda'
 
 function useDebounce(value, delay) {
   const [debounced, setDebounced] = useState(value)
@@ -27,8 +28,15 @@ export default function FoodSearch({ onLogged }) {
   useEffect(() => {
     if (debouncedQuery.length < 2) { setResults([]); return }
     setSearching(true)
-    searchFoods(debouncedQuery).then((r) => {
-      setResults(r)
+    searchFoods(debouncedQuery).then(async (r) => {
+      if (r.length > 0) {
+        setResults(r)
+        setSearching(false)
+        return
+      }
+      // Fallback to USDA when Open Food Facts returns nothing
+      const usda = await searchUSDA(debouncedQuery)
+      setResults(usda)
       setSearching(false)
     })
   }, [debouncedQuery])
@@ -67,12 +75,14 @@ export default function FoodSearch({ onLogged }) {
     const { error: dbError } = await supabase.from('food_logs').insert(entry)
     if (dbError) { setError(dbError.message); setSaving(false); return }
 
-    await supabase.from('favorites').upsert(
-      { user_id: user.id, description: entry.description, calories: entry.calories,
-        protein_g: entry.protein_g, carbs_g: entry.carbs_g, fat_g: entry.fat_g,
-        fiber_g: entry.fiber_g, items: [], last_used: new Date().toISOString() },
-      { onConflict: 'user_id,description' }
-    ).catch(() => {})
+    try {
+      await supabase.from('favorites').upsert(
+        { user_id: user.id, description: entry.description, calories: entry.calories,
+          protein_g: entry.protein_g, carbs_g: entry.carbs_g, fat_g: entry.fat_g,
+          fiber_g: entry.fiber_g, items: [], last_used: new Date().toISOString() },
+        { onConflict: 'user_id,description' }
+      )
+    } catch (_) {}
 
     setSelected(null)
     setQuery('')
@@ -119,7 +129,11 @@ export default function FoodSearch({ onLogged }) {
                   )}
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-gray-900 truncate">{p.product_name}</div>
-                    <div className="text-xs text-gray-400">{p.brands || ''} {kcal ? `· ${kcal} kcal/100g` : ''}</div>
+                    <div className="text-xs text-gray-400">
+                      {p.brands || ''}
+                      {kcal ? ` · ${kcal} kcal/100g` : ''}
+                      {p._source === 'usda' && <span className="ml-1 text-blue-400">USDA</span>}
+                    </div>
                   </div>
                 </button>
               )
@@ -187,7 +201,7 @@ export default function FoodSearch({ onLogged }) {
       {!selected && query.length >= 2 && !searching && results.length === 0 && (
         <p className="text-sm text-gray-400 text-center py-2">No results found — try a different term</p>
       )}
-      <p className="text-xs text-center text-gray-400">Data from Open Food Facts — free, no API key</p>
+      <p className="text-xs text-center text-gray-400">Open Food Facts · USDA FoodData Central</p>
     </div>
   )
 }
